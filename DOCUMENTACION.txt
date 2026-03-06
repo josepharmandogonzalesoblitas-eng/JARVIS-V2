@@ -1,0 +1,164 @@
+========================================================
+             JARVIS V2 - ASISTENTE PERSONAL (MÓVIL)
+========================================================
+
+1. RESUMEN DEL PROYECTO
+--------------------------------------------------------
+JARVIS V2 es un Asistente Virtual Conversacional basado en IA (Google Gemini 2.0/1.5) diseñado para interactuar principalmente a través de Telegram (para uso en dispositivos móviles). 
+Su objetivo principal no es solo responder preguntas, sino ser un "compañero estratégico" proactivo: ayuda al usuario a optimizar su tiempo, recuerda detalles de su vida a corto y largo plazo, y envía notificaciones autónomas basadas en una programación (CRON).
+
+Cuenta con un sistema de "Memoria Híbrida":
+- Memoria Estructurada (JSON): Para datos rígidos como el perfil del usuario, proyectos y bitácora diaria.
+- Memoria Rápida (JSON): Para recordatorios y contexto diario (ej. "ir al banco").
+- Memoria Semántica a Largo Plazo (ChromaDB): Para guardar gustos, relaciones e información vital sin saturar el prompt.
+
+2. ESTRUCTURA DE CARPETAS Y ARCHIVOS
+--------------------------------------------------------
+[... Estructura Original ...]
+
+3. ANÁLISIS DEL PROYECTO (PROS Y CONTRAS)
+--------------------------------------------------------
+[... Contenido Original ...]
+
+4. ROADMAP CUMPLIDO (V2.1)
+--------------------------------------------------------
+✅ Asincronía Completa (asyncio) liberando Telegram del bloqueo de IO de la IA.
+✅ Sistema de Backup automático ejecutado a las 3:00 AM mediante CRON.
+✅ Búsqueda Web en Tiempo Real integrada (duckduckgo_search) para resolver dudas de eventos muy recientes.
+✅ Soporte para Notas de Voz nativo: Se sube el archivo .ogg directamente a la API Multimodal de Google Gemini.
+✅ Análisis Predictivo de Energía: El orquestador lee los últimos 3 días de la bitácora y se autoinyecta el promedio energético actual del usuario para que Jarvis lo tenga en consideración.
+
+ROADMAP CUMPLIDO (V2.2)
+--------------------------------------------------------
+✅ Integración con Google Calendar y Google Tasks: Jarvis ahora puede crear eventos en Google Calendar y tareas en Google Tasks.
+✅ Sistema de Sanitización de Entradas: Se ha implementado un sistema de sanitización para evitar ataques de inyección de código.
+✅ Mejoras en el sistema de memoria: Se ha mejorado el sistema de memoria para un mejor rendimiento y una mayor precisión.
+
+5. FUTURO: OPORTUNIDADES DE MEJORA (V3)
+--------------------------------------------------------
+✅ Reconocimiento OCR y de Imágenes enviando fotos por Telegram.
+✅ Respuesta en Notas de Voz (Sintetizador ElevenLabs / OpenAI TTS).
+✅ Integración con IFTTT para automatizaciones complejas.
+
+========================================================
+         INFORME DE DESPLIEGUE EN DIGITALOCEAN
+========================================================
+
+REPORTE DE RECURSOS ACTUALES (DIGITALOCEAN DROPLET)
+--------------------------------------------------------
+- CPU: 1 vCPU (2.0 GHz)
+- RAM Física Total: 1 GB (961 MiB)
+- RAM Disponible Actual: ~418 MiB (con Jarvis y Nginx corriendo)
+- Almacenamiento: 24 GB totales (14 GB disponibles)
+- Memoria Virtual (Swap): 4 GB (Configurada para protección OOM)
+
+ESTADO DE LOS CONTENEDORES ACTIVOS
+--------------------------------------------------------
+1. Nginx Proxy Manager: Consume ~100-150 MiB de RAM.
+2. JARVIS_V2 (Bot Telegram): Consume recursos moderados. Su límite en `docker-compose.yml` está configurado a 512 MiB.
+   
+ANÁLISIS DE FACTIBILIDAD: DESPLIEGUE DE BUHO SAAS (MOTOR AUDIO JSON)
+--------------------------------------------------------
+Tras analizar a fondo el código fuente y la arquitectura de la Fase B de "SMART MILL / FACTORY CORE (SAAS)" en la carpeta `MOTOR AUDIO JSON`, este es el desglose del consumo real esperado en producción (sin contar límites artificiales, solo lo que la tecnología exige físicamente):
+
+1. Base de Datos (PostgreSQL + TimescaleDB + pgvector): Las bases de datos relacionales con extensiones vectoriales y partición IoT son pesadas. Requiere un mínimo absoluto de ~500 MB en reposo/operaciones básicas (Recomendado 1GB+).
+2. Backend (FastAPI + Uvicorn + SQLAlchemy): Un worker básico consumirá ~150 MB.
+3. Frontend (React SPA servido estáticamente por Nginx): Consumo ínfimo, ~20 MB.
+4. Nginx Proxy Manager (Ya corriendo): ~150 MB.
+5. JARVIS_V2 (Ya corriendo): ~150 MB.
+6. Sistema Operativo Base (Ubuntu): ~200 MB.
+
+📊 CÁLCULO DE MEMORIA RAM TOTAL:
+- Consumo Base Estimado: 500 + 150 + 20 + 150 + 150 + 200 = 1,170 MB (1.17 GB).
+- Margen de Seguridad del 30% (Para evitar cuelgues por picos de tráfico/consultas): 1170 * 1.30 = 1,521 MB (1.52 GB).
+- RAM Física de tu Droplet Actual: 961 MB.
+👉 Déficit de RAM: Te faltan físicamente unos ~560 MB solo para que el sistema "respire" y no colapse. 
+
+📊 CÁLCULO DE CPU:
+- TimescaleDB (IoT) y búsquedas pgvector son intensivas. 
+- FastApi y el ruteo de Nginx requieren procesamiento en tiempo real.
+- Tu Droplet actual tiene 1 vCPU compartida. Al haber tareas concurrentes (Jarvis escuchando en Telegram + Buho insertando telemetría), la CPU llegará al 100% de uso.
+
+❌ LIMITANTES CRÍTICAS EN EL SERVIDOR ACTUAL:
+1. OOM Killer (Out of Memory): Al superar el 100% de la RAM física, el sistema operativo empezará a matar contenedores aleatoriamente (podría matar a Jarvis o a la base de datos perdiendo datos).
+2. Thrashing Extremo: Al usar los 4GB de Swap que configuré para compensar la falta de RAM, el disco duro SSD actuará como memoria. Esto vuelve todo el servidor entre 10x y 100x más lento, provocando "Timeouts" (caídas) en las peticiones de tu frontend.
+3. Cuello de Botella CPU: 1 núcleo no es suficiente para la arquitectura "Smart Mill" + Jarvis.
+
+CONCLUSIÓN Y RECOMENDACIÓN EXACTA
+--------------------------------------------------------
+No es viable desplegar el ecosistema "Buho SaaS" en el servidor actual (1GB RAM / 1 vCPU). Fallará irremediablemente al procesar las peticiones IoT o al usar la IA.
+
+Recomendación Directa (Escalamiento Vertical):
+Entra al panel de DigitalOcean y haz un "Resize" (Redimensionamiento) del Droplet actual a un plan de:
+👉 Mínimo: 2 vCPUs y 2 GB de RAM.
+👉 Ideal (Recomendado): 2 vCPUs y 4 GB de RAM (Para garantizar fluidez en las búsquedas vectoriales y el procesamiento de audio/telemetría futura).
+
+========================================================
+         MANUAL DE USUARIO Y PLAN DE PRUEBAS
+========================================================
+
+CAPACIDADES ACTUALES DE JARVIS V2 (LO QUE SÍ PUEDE HACER)
+--------------------------------------------------------
+1. Conversación Natural y Empática: Entiende el contexto de mensajes anteriores y mantiene el hilo de la conversación.
+2. Memoria a Corto Plazo (Recordatorios Rápidos): Puede agendar tareas o compras a corto plazo (ej. "Añade comprar leche a la lista").
+3. Memoria Semántica a Largo Plazo: Si le compartes un gusto, fecha importante, o relación familiar, Jarvis decide autónomamente si vale la pena guardarlo en su base vectorial profunda para recordarlo semanas después.
+4. Procesamiento de Audios/Notas de Voz: Puedes enviarle notas de voz largas directamente desde Telegram. Escuchará y analizará el contenido como si lo hubieses escrito.
+5. Recordatorios y Alarmas Programadas: Puedes decirle "Avísame a las 15:30 que saque la ropa" y él usará una herramienta de agenda para enviarte un mensaje exacto a esa hora de hoy.
+6. Consultas de Estado del Sistema: Puedes preguntarle "¿Qué hora es?" o "¿Cómo está el sistema?" para obtener reportes de la hora actual y métricas del servidor.
+7. Búsqueda Web en Tiempo Real: Puedes preguntarle sobre noticias actuales (ej. "Busca quién ganó el partido de hoy") y Jarvis usará su motor DuckDuckGo.
+8. Proactividad CRON: Enviará mensajes automáticamente (siempre y cuando se configure un horario en `cron.py`) para revisar tu nivel de energía y preguntarte por tu día, usando un análisis predictivo basado en los últimos 3 días.
+9. Creación de Eventos y Tareas: Puedes pedirle a Jarvis que cree un evento en tu Google Calendar o una tarea en tu Google Tasks.
+
+LIMITACIONES ACTUALES (LO QUE NO PUEDE HACER)
+--------------------------------------------------------
+1. Tareas Multi-paso sin Supervisión: No puede ejecutar secuencias autónomas de operaciones largas que no estén codificadas como una herramienta atómica.
+2. Procesamiento de Imágenes/Video: Aunque soporta notas de voz (.ogg), actualmente no procesa fotos o documentos PDF que envíes por Telegram.
+3. Llamadas de Voz Bidireccionales (Llamada telefónica): Lee audios, pero te responderá en texto.
+
+¿QUÉ MÁS SE LE PODRÍA AÑADIR (ROADMAP RÁPIDO)?
+--------------------------------------------------------
+- Reconocimiento OCR y de Imágenes enviando fotos por Telegram.
+- Respuesta en Notas de Voz (Sintetizador ElevenLabs / OpenAI TTS).
+- Integración con IFTTT para automatizaciones complejas.
+
+PLAN DE PRUEBAS PARA LA SEMANA (CHECKLIST DE EVALUACIÓN)
+--------------------------------------------------------
+Para validar que el entorno de DigitalOcean y el código de Jarvis están operando al 100%, realiza las siguientes pruebas a través de Telegram:
+
+✅ PRUEBA 1: Comunicación Básica y Zero-Trust
+- [ ] Envíale un simple "Hola". (Debe responder con naturalidad).
+- [ ] Pide a un amigo que envíe un mensaje a tu Bot desde su cuenta. (El bot no debe responderle o debe rechazarlo, confirmando el blindaje del ID).
+
+✅ PRUEBA 2: Consulta del Sistema
+- [ ] Pregúntale: "Dime la hora exacta de tu sistema". (Validará que la zona horaria de DigitalOcean esté en UTC o tu zona local y que la herramienta interna funcione).
+
+✅ PRUEBA 3: Memoria a Corto Plazo (Contexto Diario)
+- [ ] Dile: "Voy a ir al súper más tarde, recuérdame comprar leche".
+- [ ] Tras unos mensajes, pregúntale: "¿Qué tenía que comprar?". (Debe revisar su contexto JSON y decírtelo).
+
+✅ PRUEBA 4: Recordatorios Temporizados
+- [ ] Dile: "Avísame a las [Pon una hora 3 minutos en el futuro] que tengo una reunión".
+- [ ] Cierra Telegram y espera. A la hora exacta, el bot debe enviarte un mensaje proactivo.
+
+✅ PRUEBA 5: Búsqueda Web
+- [ ] Pregúntale algo muy reciente: "¿Cuál es el precio de Bitcoin hoy?" o "¿Qué pasó hoy en las noticias importantes?". (Debe usar DuckDuckGo y devolver información real, no alucinada).
+
+✅ PRUEBA 6: Procesamiento de Notas de Voz Multimodal
+- [ ] Envíale una nota de voz de 10-15 segundos explicándole qué harás hoy y pregúntale qué opina. (Debe descargar el audio en el servidor, subirlo a Gemini y responder con coherencia).
+
+✅ PRUEBA 7: Memoria a Largo Plazo Vectorial
+- [ ] Dile: "Como dato importante sobre mí: soy alérgico a los mariscos y mi hermano se llama Carlos."
+- [ ] Escribe varios mensajes irrelevantes para alejar la charla de ese tema ("qué buen clima", "cuéntame un chiste").
+- [ ] Pregúntale: "¿Recuerdas si soy alérgico a algo?" o "¿Cómo se llama mi hermano?". (Debe poder buscarlo en su base ChromaDB).
+
+✅ PRUEBA 8: Creación de Eventos y Tareas
+- [ ] Pídele a Jarvis que cree un evento en tu Google Calendar para mañana a las 10 AM con el título "Reunión de equipo".
+- [ ] Pídele a Jarvis que cree una tarea en tu Google Tasks con el título "Comprar leche".
+
+CRITERIOS DE ÉXITO (EVALUACIÓN)
+--------------------------------------------------------
+El sistema se considerará "Productivo y Estable" si:
+1. No se experimentan "Timeouts" (ausencia de respuesta por más de 15 segundos) en las interacciones diarias.
+2. El bot logra usar las 4 herramientas principales sin crashear el contenedor Docker (Memoria, Web, Sistema y Agenda).
+3. Los recordatorios CRON no detienen el flujo de la conversación normal.
+4. El contenedor en DigitalOcean se mantiene corriendo durante la semana sin entrar en estado "Killed" (OOM) o reiniciarse sorpresivamente.
