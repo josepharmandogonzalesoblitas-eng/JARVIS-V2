@@ -1,0 +1,8 @@
+# Archivo de configuración para evitar que Cline lea carpetas innecesarias (Ahorro de tokens)
+.venv/
+venv/
+__pycache__/
+LOGS/
+MEMORIA/vector_db/
+.env
+*.pyc

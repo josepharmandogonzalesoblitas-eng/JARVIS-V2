@@ -1,0 +1,12 @@
+{
+    "nombre": "Admin",
+    "edad": 30,
+    "profesion": "Ingeniero",
+    "valores_clave": [
+        "Disciplina",
+        "Automatisación"
+    ],
+    "metas_largo_plazo": [
+        "Sistema Estable"
+    ]
+}

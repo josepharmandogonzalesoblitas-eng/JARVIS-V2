@@ -1,0 +1,30 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+.env
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+LOGS/
+
+# Base de datos vectorial
+MEMORIA/vector_db/
+
+# Archivos de configuración locales
+d.py
+docker-compose.yml
+Dockerfile
+jarvis_deploy.tar.gz
+
+# Claves de Google
+credentials.json
+token.json
+
+# Carpetas ocultas del sistema (opcional)
+.DS_Store
+Thumbs.db
