@@ -7,7 +7,7 @@ import os
 import platform
 import logging
 import psutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any
 
 logger = logging.getLogger("tool_system")
@@ -69,7 +69,7 @@ def ejecutar_herramienta_sistema(nombre: str, params: Dict[str, Any]) -> str:
             from src.core.cron import cron_manager
             
             # Calculamos la hora sumando los minutos a la hora actual
-            hora_futura = datetime.now() + datetime.timedelta(minutes=int(minutos))
+            hora_futura = datetime.now() + timedelta(minutes=int(minutos))
             hora_hhmm = hora_futura.strftime('%H:%M')
             
             resultado = cron_manager.agendar_alarma_dinamica(hora_hhmm, f"[TIMER {minutos}m] {mensaje}")
