@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 from datetime import datetime
+from enum import Enum
 import uuid
 
 # --- BLOQUE 1: IDENTIDAD Y CONTEXTO ---
@@ -11,6 +12,10 @@ class Persona(BaseModel):
     profesion: str
     valores_clave: List[str] = Field(default_factory=list, description="Principios innegociables del usuario")
     metas_largo_plazo: List[str] = Field(default_factory=list)
+    preferencias: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Gustos y preferencias del usuario. Ej: {'color_favorito': 'azul', 'animal_favorito': 'gatos'}"
+    )
 
 class Entorno(BaseModel):
     ubicacion: str
@@ -79,3 +84,66 @@ class MemoriaTotal(BaseModel):
     proyectos: GestorProyectos
     bitacora: RegistroDiario
     contexto: GestorContexto
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BLOQUE 5: PERSONALIDAD, EMOCIONES E INTELIGENCIA CONTEXTUAL
+# ═══════════════════════════════════════════════════════════════════
+
+class ModoConversacion(str, Enum):
+    """Modos de conversación activos en JARVIS."""
+    NORMAL = "normal"
+    ESCUCHA_PROFUNDA = "escucha_profunda"
+    TRABAJO_PROFUNDO = "trabajo_profundo"
+    TERAPEUTA = "terapeuta"
+    SILENCIOSO = "silencioso"
+
+
+class ConversacionProfundaItem(BaseModel):
+    """
+    Registro de una conversación importante con seguimiento automático.
+    JARVIS guarda esto para preguntar semanas después cómo resultó.
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    resumen: str
+    tipo: str = Field(
+        default="general",
+        description="salud | relacion | meta | crisis | trabajo | personal | general"
+    )
+    fecha: str = Field(description="YYYY-MM-DD de cuándo ocurrió")
+    fecha_followup: Optional[str] = Field(
+        default=None,
+        description="YYYY-MM-DD cuando JARVIS debe preguntar cómo resultó"
+    )
+    completado: bool = False  # True cuando ya se hizo el follow-up
+
+
+class EstadoEmocionalSistema(BaseModel):
+    """
+    Estado emocional del sistema para detección de patrones, crisis y logros.
+    Persistido en estado_emocional.json
+    """
+    conversaciones_profundas: List[ConversacionProfundaItem] = Field(
+        default_factory=list,
+        description="Conversaciones marcadas para seguimiento posterior"
+    )
+    ultima_crisis_detectada: Optional[str] = Field(
+        default=None,
+        description="Fecha (YYYY-MM-DD) de la última señal de crisis detectada"
+    )
+    dias_negativos_consecutivos: int = Field(
+        default=0,
+        description="Contador de días seguidos con estado de ánimo negativo"
+    )
+    ultimo_logro_celebrado: Optional[str] = Field(
+        default=None,
+        description="Descripción del último logro celebrado"
+    )
+    metas_ultima_mencion: Dict[str, str] = Field(
+        default_factory=dict,
+        description="meta -> fecha_ultima_mencion (YYYY-MM-DD) para triggers inteligentes"
+    )
+    sugerencias_enviadas: List[str] = Field(
+        default_factory=list,
+        description="Títulos de sugerencias ya enviadas (para no repetir)"
+    )

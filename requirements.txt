@@ -10,6 +10,16 @@ google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 pytz
+requests
+
+# TTS (Text-to-Speech) - Gratuito, sin API key
+gTTS
+
+# Gráficos y visualizaciones
+matplotlib
+
+# Procesamiento de imágenes
+Pillow
 
 # Testing
 pytest

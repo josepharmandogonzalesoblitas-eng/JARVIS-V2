@@ -60,6 +60,14 @@ def init_db():
                 "eventos_importantes": [],
                 "notas_ia": "Inicio de sistema."
             }
+        },
+        "estado_emocional.json": {
+            "conversaciones_profundas": [],
+            "ultima_crisis_detectada": None,
+            "dias_negativos_consecutivos": 0,
+            "ultimo_logro_celebrado": None,
+            "metas_ultima_mencion": {},
+            "sugerencias_enviadas": []
         }
     }
 

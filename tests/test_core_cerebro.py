@@ -1,6 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
+from google.genai import types
 from google.genai.errors import APIError
 
 # Importar la clase a probar
@@ -132,10 +133,10 @@ async def test_cerebro_with_audio(mock_genai, tmp_path):
     cerebro = CerebroDigital()
     await cerebro.pensar("Transcripción", "contexto", audio_file_path=str(audio_file))
 
-    # Verificar que se intentó subir el archivo
+    # Verificar que se intentó subir el archivo con UploadFileConfig (no dict)
     mock_genai.Client.return_value.files.upload.assert_called_once_with(
         file=str(audio_file),
-        config={"mime_type": "audio/ogg"}
+        config=types.UploadFileConfig(mime_type="audio/ogg")
     )
     # Verificar que el prompt contiene la referencia al audio
     call_args = mock_genai.Client.return_value.aio.models.generate_content.call_args
