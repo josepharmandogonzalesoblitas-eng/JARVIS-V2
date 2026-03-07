@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  jarvis_v2:
+    build: .
+    container_name: jarvis_v2_bot
+    restart: unless-stopped
+    volumes:
+      # Persistencia de datos entre reinicios del contenedor (Idempotencia)
+      - ./MEMORIA:/app/MEMORIA
+      - ./LOGS:/app/LOGS
+    env_file:
+      - .env
+    # Recursos ajustados para V2 (TTS + Matplotlib + ChromaDB)
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'     # Máximo 1 CPU Core
+          memory: 1G      # 1GB: suficiente para gTTS + Matplotlib + ChromaDB
+        reservations:
+          cpus: '0.2'
+          memory: 256M
