@@ -123,12 +123,27 @@ LIMITACIONES ACTUALES (LO QUE NO PUEDE HACER)
 1. Tareas Multi-paso sin Supervisión: No puede ejecutar secuencias autónomas de operaciones largas que no estén codificadas como una herramienta atómica.
 2. Procesamiento de Imágenes/Video: Aunque soporta notas de voz (.ogg), actualmente no procesa fotos o documentos PDF que envíes por Telegram.
 3. Llamadas de Voz Bidireccionales (Llamada telefónica): Lee audios, pero te responderá en texto.
+4. Alarmas Nativas del Celular: Como Jarvis vive en un servidor y se comunica por Telegram, no tiene acceso al sistema operativo de tu teléfono para configurar alarmas nativas. Solo puede enviarte recordatorios como un mensaje de chat a una hora determinada.
 
 ¿QUÉ MÁS SE LE PODRÍA AÑADIR (ROADMAP RÁPIDO)?
 --------------------------------------------------------
 - Reconocimiento OCR y de Imágenes enviando fotos por Telegram.
 - Respuesta en Notas de Voz (Sintetizador ElevenLabs / OpenAI TTS).
 - Integración con IFTTT para automatizaciones complejas.
+
+FILOSOFÍA DE PRUEBAS: ¿POR QUÉ LOS PYTEST USAN "MOCKS" Y NO DATOS REALES?
+--------------------------------------------------------
+Durante la auditoría, usamos **"Mocks"** (simulaciones) para las pruebas automatizadas. Por eso, aunque los 39 tests pasaban, al probarlo en el mundo real aparecieron errores con las APIs de Google. Esto es **normal y es el diseño correcto de pruebas**. La razón es la siguiente:
+
+1.  **Pruebas Unitarias/Integración (Las que hicimos con Pytest y Mocks):**
+    *   **Objetivo:** Probar NUESTRO código, no el de Google. La pregunta es: "Si Google respondiera 'X', ¿mi código haría 'Y'?".
+    *   **Ventajas:** Son extremadamente rápidas (segundos), no dependen de una conexión a internet, no gastan tu cuota de API, y no fallan si el servidor de Google se cae. Aislan el problema a nuestro código.
+
+2.  **Pruebas End-to-End o Manuales (Las que tú estás haciendo ahora en Telegram):**
+    *   **Objetivo:** Probar el sistema completo en un entorno REAL, incluyendo la conexión con Google, la base de datos, etc.
+    *   **Ventajas:** Encuentran problemas del "mundo real" que los Mocks no pueden ver, como credenciales vencidas, APIs desactivadas (el error 403), o cambios inesperados en la API de un proveedor (el error del `mime_type`).
+
+En resumen: Ambas pruebas son cruciales y no se reemplazan. Los Mocks nos permitieron asegurar que la lógica interna de Jarvis es sólida. Ahora, tus pruebas manuales nos ayudan a afinar la conexión con el mundo exterior.
 
 SOLUCIÓN A ERRORES FRECUENTES (TROUBLESHOOTING)
 --------------------------------------------------------
