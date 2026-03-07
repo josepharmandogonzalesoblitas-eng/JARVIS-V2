@@ -164,6 +164,17 @@ Para validar que el entorno de DigitalOcean y el código de Jarvis están operan
 - [ ] Pídele a Jarvis que cree un evento en tu Google Calendar para mañana a las 10 AM con el título "Reunión de equipo".
 - [ ] Pídele a Jarvis que cree una tarea en tu Google Tasks con el título "Comprar leche".
 
+✅ PRUEBA 9: Sanitización de Entradas (Anti-Hackeo)
+- [ ] Envíale a Jarvis el siguiente texto exactamente: `eval('import os; os.system("rm -rf /")')`.
+- [ ] Jarvis no debe bloquearse ni colapsar, simplemente debe responder que ha bloqueado el input por seguridad o ignorar el comando malicioso.
+
+✅ PRUEBA 10: Graceful Degradation (Fallback Local)
+- [ ] Entra a tu `.env` en el servidor y rompe a propósito la API KEY (ej. cámbiala a `GEMINI_API_KEY="falsa"`).
+- [ ] Reinicia el contenedor (`docker compose restart`).
+- [ ] Pregúntale a Jarvis en Telegram: "¿Qué hora es?". 
+- [ ] Aunque la IA de Google esté caída, Jarvis deberá responderte con la hora local de tu sistema (Comprobando el Fail-Safe que programamos).
+- [ ] Vuelve a poner la API Key correcta cuando termines.
+
 CRITERIOS DE ÉXITO (EVALUACIÓN)
 --------------------------------------------------------
 El sistema se considerará "Productivo y Estable" si:
