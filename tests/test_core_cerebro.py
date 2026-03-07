@@ -133,7 +133,10 @@ async def test_cerebro_with_audio(mock_genai, tmp_path):
     await cerebro.pensar("Transcripción", "contexto", audio_file_path=str(audio_file))
 
     # Verificar que se intentó subir el archivo
-    mock_genai.Client.return_value.files.upload.assert_called_once_with(file=str(audio_file))
+    mock_genai.Client.return_value.files.upload.assert_called_once_with(
+        file=str(audio_file),
+        config={"mime_type": "audio/ogg"}
+    )
     # Verificar que el prompt contiene la referencia al audio
     call_args = mock_genai.Client.return_value.aio.models.generate_content.call_args
     # call_args.kwargs['contents']

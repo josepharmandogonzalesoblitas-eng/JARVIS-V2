@@ -96,7 +96,13 @@ class CerebroDigital:
                 # El texto va primero
                 contenidos.append(prompt_completo)
                 # Luego el audio (usando la nueva SDK file api)
-                audio_file = await asyncio.to_thread(self.client.files.upload, file=audio_file_path)
+                # OGG en telegram es audio/ogg
+                config = {"mime_type": "audio/ogg"}
+                audio_file = await asyncio.to_thread(
+                    self.client.files.upload, 
+                    file=audio_file_path, 
+                    config=config
+                )
                 contenidos.append(audio_file)
             else:
                 # Si no hay audio, solo va el texto
