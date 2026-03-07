@@ -87,6 +87,7 @@ async def async_ejecutar_memoria(datos: Dict[str, Any]) -> str:
             persona = await db_handler.async_read_data("persona.json", schemas.Persona)
             
             if accion == "actualizar_persona":
+                if "nombre" in contenido: persona.nombre = contenido["nombre"]
                 if "edad" in contenido: persona.edad = contenido["edad"]
                 if "profesion" in contenido: persona.profesion = contenido["profesion"]
                 if "nuevo_valor" in contenido and contenido["nuevo_valor"] not in persona.valores_clave:
@@ -100,6 +101,8 @@ async def async_ejecutar_memoria(datos: Dict[str, Any]) -> str:
             contexto = await db_handler.async_read_data("contexto.json", schemas.GestorContexto)
             
             if accion == "nuevo_recordatorio":
+                if not contenido.get("contexto_asociado"):
+                    contenido["contexto_asociado"] = "general"
                 nuevo_record = schemas.Recordatorio(**contenido)
                 contexto.recordatorios_pendientes.append(nuevo_record)
                 await db_handler.async_save_data("contexto.json", contexto)

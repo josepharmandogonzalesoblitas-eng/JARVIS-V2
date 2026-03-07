@@ -89,18 +89,27 @@ async def test_orquestador_flujo_comando(orquestador_con_mocks):
     assert "Herramienta ejecutada mock" in respuesta
 
 async def test_orquestador_flujo_memoria(orquestador_con_mocks):
-    """Prueba que una intención de 'actualizar_memoria' llama al repositorio de memoria asíncrono."""
+    """Prueba que una intención de 'guardar_recordatorio' llama al MemoryManager."""
     pensamiento = PensamientoJarvis(
-        intencion="actualizar_memoria",
-        razonamiento="N/A",
-        respuesta_usuario="Memoria actualizada.",
-        datos_extra={"accion": "nuevo_recordatorio"}
+        intencion="guardar_recordatorio",
+        respuesta_usuario="Recordatorio guardado.",
+        memoria_intencion="nuevo_recordatorio",
+        memoria_datos={"descripcion": "comprar pan", "contexto": "supermercado"}
     )
     orquestador_con_mocks.cerebro.pensar.return_value = pensamiento
     
-    await orquestador_con_mocks.procesar_mensaje("user1", "recuérdame comprar pan", None)
-    
-    orquestador_con_mocks.tools_repo.async_ejecutar_memoria.assert_called_once_with({"accion": "nuevo_recordatorio"})
+    with patch('src.core.orquestador.MemoryManager') as mock_memory_manager_class:
+        mock_memory_manager = mock_memory_manager_class.return_value
+        mock_memory_manager.procesar_intencion_memoria = AsyncMock(return_value="Guardado")
+        orquestador_con_mocks.memory_manager = mock_memory_manager
+        
+        respuesta = await orquestador_con_mocks.procesar_mensaje("user1", "recuérdame comprar pan", None)
+        
+        mock_memory_manager.procesar_intencion_memoria.assert_called_once_with(
+            "nuevo_recordatorio",
+            {"descripcion": "comprar pan", "contexto": "supermercado"}
+        )
+        assert respuesta == "Recordatorio guardado."
 
 async def test_orquestador_fail_safe_fallback(orquestador_con_mocks):
     """Prueba el Graceful Degradation del orquestador si Gemini devuelve fallback."""

@@ -13,9 +13,8 @@ logger = logging.getLogger("db_handler")
 # Directorio base para la memoria
 MEMORY_PATH = "MEMORIA"
 
-# Lock Global unificado asíncrono para prevenir Race Conditions en operaciones I/O
-# Como ahora el CRON corre en el mismo Thread y EventLoop, solo necesitamos Lock Asíncrono
-_db_lock_async = asyncio.Lock()
+# Lock Global unificado para prevenir Race Conditions en operaciones I/O
+_db_lock = ThreadLock()
 
 def _get_path(filename: str) -> str:
     return os.path.join(MEMORY_PATH, filename)
@@ -47,12 +46,20 @@ def init_db():
         "proyectos.json": {
             "proyectos_activos": {}
         },
+        "contexto.json": {
+            "recordatorios_pendientes": [],
+            "lugares_frecuentes": {},
+            "rutinas_diarias": []
+        },
         "bitacora.json": {
-            "fecha": "2024-01-01",
-            "nivel_energia": 8,
-            "estado_animo": "Estable",
-            "eventos_importantes": [],
-            "notas_ia": "Inicio de sistema."
+            "historico_dias": {},
+            "dia_actual": {
+                "fecha": "2024-01-01",
+                "nivel_energia": 8,
+                "estado_animo": "Estable",
+                "eventos_importantes": [],
+                "notas_ia": "Inicio de sistema."
+            }
         }
     }
 
@@ -79,9 +86,8 @@ def read_data(filename: str, model: Type[BaseModel]) -> BaseModel:
         raise e
 
 async def async_read_data(filename: str, model: Type[BaseModel]) -> BaseModel:
-    """Versión asíncrona segura de lectura, envuelve la sincrónica con run_in_executor y lock asíncrono."""
-    async with _db_lock_async:
-        return await asyncio.to_thread(read_data, filename, model)
+    """Versión asíncrona segura de lectura, envuelve la sincrónica con run_in_executor y lock."""
+    return await asyncio.to_thread(read_data, filename, model)
 
 def save_data(filename: str, data: BaseModel):
     path = _get_path(filename)
@@ -103,9 +109,8 @@ def save_data(filename: str, data: BaseModel):
         raise e
 
 async def async_save_data(filename: str, data: BaseModel):
-    """Versión asíncrona segura de escritura, envuelve la sincrónica con run_in_executor y lock asíncrono."""
-    async with _db_lock_async:
-        await asyncio.to_thread(save_data, filename, data)
+    """Versión asíncrona segura de escritura, envuelve la sincrónica con run_in_executor."""
+    return await asyncio.to_thread(save_data, filename, data)
 
 async def async_read_bitacora_summary() -> schemas.BitacoraSummary:
     """

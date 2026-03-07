@@ -3,10 +3,59 @@ import logging
 import asyncio
 import chromadb
 from datetime import datetime
+from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
 
 logger = logging.getLogger("vector_db")
 
-from chromadb.utils import embedding_functions
+
+class GoogleGenAIEmbeddingFunction(EmbeddingFunction[Documents]):
+    """
+    Función de embedding personalizada usando la nueva SDK google.genai.
+    
+    Hereda de chromadb.EmbeddingFunction[Documents] para:
+    - Obtener embed_query() heredado (requerido por chromadb 1.5+)
+    - Validación y normalización automática de embeddings vía __init_subclass__
+    - Reemplazar la deprecada GoogleGenerativeAiEmbeddingFunction de chromadb
+      (que usaba google.generativeai, la SDK antigua)
+    """
+    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+        from google import genai
+        self._client = genai.Client(api_key=api_key)
+        self._model_name = model_name
+
+    @staticmethod
+    def name() -> str:
+        return "google_genai_embedding_fn"
+
+    def get_config(self) -> dict:
+        return {"model_name": self._model_name}
+
+    @staticmethod
+    def build_from_config(config: dict) -> "GoogleGenAIEmbeddingFunction":
+        import os
+        return GoogleGenAIEmbeddingFunction(
+            api_key=os.getenv("GEMINI_API_KEY", ""),
+            model_name=config.get("model_name", "models/text-embedding-004")
+        )
+
+    def __call__(self, input: Documents) -> Embeddings:
+        """
+        Genera embeddings para una lista de textos.
+        Args:
+            input: lista de strings (Documents)
+        Returns:
+            Lista de vectores (Embeddings)
+        """
+        try:
+            response = self._client.models.embed_content(
+                model=self._model_name,
+                contents=input
+            )
+            return [list(e.values) for e in response.embeddings]
+        except Exception as e:
+            logger.error(f"Error generando embeddings con google.genai: {e}")
+            raise
+
 
 class GestorVectorial:
     """
@@ -21,27 +70,21 @@ class GestorVectorial:
         self._lock = asyncio.Lock()
         
         try:
-            # Recuperamos API KEY globalmente o lanzamos error (Poka-Yoke)
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError("Falta GEMINI_API_KEY para Embeddings Vectoriales.")
 
-            # Inicialización Lazy Loading (se retrasa hasta que se pida si quisiéramos)
-            # Usamos Google Generative AI Embeddings para delegar cómputo
-            google_ef = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
-                api_key=api_key,
-                model_name="models/embedding-001"
-            )
+            # Usamos la nueva SDK google.genai para embeddings
+            embedding_fn = GoogleGenAIEmbeddingFunction(api_key=api_key)
 
             self.client = chromadb.PersistentClient(path=self.persist_directory)
             
-            # Recreamos/Obtenemos colección inyectando el embedding remote
             self.collection = self.client.get_or_create_collection(
                 name="recuerdos_jarvis",
-                embedding_function=google_ef,
+                embedding_function=embedding_fn,
                 metadata={"hnsw:space": "cosine"}
             )
-            logger.info("ChromaDB inicializado (Google Embeddings O(1) RAM).")
+            logger.info("ChromaDB inicializado (Google Embeddings nueva SDK, O(1) RAM).")
         except Exception as e:
             logger.error(f"Error inicializando ChromaDB: {e}")
             self.collection = None
@@ -52,8 +95,6 @@ class GestorVectorial:
             return "Error: Base de datos vectorial no disponible."
         
         # IDEMPOTENCIA: Verificar si un recuerdo muy similar ya existe.
-        # Esto es costoso, así que lo hacemos de forma simple: buscar primero.
-        # Una mejor implementación podría usar hashes o verificar por un ID de origen.
         try:
             resultados = await asyncio.to_thread(
                 self.collection.query,
@@ -61,27 +102,22 @@ class GestorVectorial:
                 n_results=1,
                 include=["distances"]
             )
-            # Si encuentra algo muy cercano (distancia coseno baja), no lo inserta.
             if resultados and resultados['distances'] and resultados['distances'][0] and resultados['distances'][0][0] < 0.05:
                 logger.warning(f"IDEMPOTENCIA: Recuerdo duplicado detectado. No se guardará: '{texto_recuerdo[:50]}...'")
                 return "Este recuerdo ya está registrado."
         except Exception as e:
             logger.error(f"Error en chequeo de idempotencia de ChromaDB: {e}")
-            # No bloqueamos la operación si la verificación falla, solo logueamos.
 
         async with self._lock:
             return await asyncio.to_thread(self.agregar_recuerdo, texto_recuerdo, tipo)
 
     def agregar_recuerdo(self, texto_recuerdo: str, tipo: str = "general") -> str:
-        """
-        Agrega un nuevo recuerdo a la base de datos vectorial.
-        """
+        """Agrega un nuevo recuerdo a la base de datos vectorial."""
         if not self.collection:
             return "Error: Base de datos vectorial no disponible."
             
         try:
-            # Usamos un timestamp como ID único
-            doc_id = f"mem_{int(datetime.now().timestamp())}"
+            doc_id = f"mem_{int(datetime.now().timestamp() * 1000)}"
             
             self.collection.add(
                 documents=[texto_recuerdo],
@@ -94,18 +130,14 @@ class GestorVectorial:
             logger.error(f"Error al guardar recuerdo: {e}")
             return f"Error al guardar recuerdo: {str(e)}"
 
-    def buscar_contexto(self, query: str, n_results: int = 3) -> str:
-        """
-        Busca recuerdos relevantes basados en la consulta actual.
-        Retorna un string formateado con los recuerdos encontrados.
-        """
+    def buscar_recuerdos_relevantes(self, query: str, n_results: int = 3) -> list:
+        """Busca recuerdos relevantes y devuelve los documentos."""
         if not self.collection:
-            return ""
+            return []
 
-        # GRACEFUL DEGRADATION: Si ChromaDB falla, el bot sigue funcionando.
         try:
             if self.collection.count() == 0:
-                return "Aún no hay recuerdos a largo plazo."
+                return []
                 
             resultados = self.collection.query(
                 query_texts=[query],
@@ -113,21 +145,47 @@ class GestorVectorial:
             )
             
             if not resultados['documents'] or not resultados['documents'][0]:
-                return "No se encontraron recuerdos relevantes."
+                return []
                 
-            docs = resultados['documents'][0]
-            metas = resultados['metadatas'][0]
-            
-            memoria_str = "--- RECUERDOS RELEVANTES (LARGO PLAZO) ---\n"
-            for doc, meta in zip(docs, metas):
-                fecha = meta.get("fecha", "N/A").split("T")[0]
-                memoria_str += f"- [{fecha}]: {doc}\n"
-                
-            return memoria_str
+            return resultados['documents'][0]
             
         except Exception as e:
             logger.error(f"FAIL-SAFE: Error buscando en memoria vectorial: {e}")
-            return "No se pudo acceder a la memoria a largo plazo en este momento."
+            return []
 
-# Instancia global para ser usada por los demás módulos
+    async def async_buscar_recuerdos_relevantes(self, query: str, n_results: int = 3) -> list:
+        """Versión asíncrona para buscar recuerdos relevantes."""
+        async with self._lock:
+            return await asyncio.to_thread(self.buscar_recuerdos_relevantes, query, n_results)
+
+    def buscar_contexto(self, query: str, n_results: int = 3) -> str:
+        """
+        Busca recuerdos relevantes basados en la consulta actual.
+        Retorna un string formateado con los recuerdos encontrados.
+        """
+        docs = self.buscar_recuerdos_relevantes(query, n_results)
+        if not docs:
+            return "No se encontraron recuerdos relevantes."
+
+        memoria_str = "--- RECUERDOS RELEVANTES (LARGO PLAZO) ---\n"
+        for doc in docs:
+            memoria_str += f"- {doc}\n"
+            
+        return memoria_str
+
+    def indexar_documento(self, doc_id: str, texto: str, metadata=None):
+        """Indexa un documento con un ID personalizado."""
+        if not self.collection:
+            return
+        try:
+            self.collection.add(
+                documents=[texto],
+                ids=[doc_id],
+                metadatas=[metadata or {}]
+            )
+        except Exception as e:
+            logger.error(f"Error indexando documento: {e}")
+
+
+# Instancia global — usada como fallback si no se inyecta vector_repo
 vector_db = GestorVectorial()
