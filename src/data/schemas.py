@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 from datetime import datetime
+import uuid
 
 # --- BLOQUE 1: IDENTIDAD Y CONTEXTO ---
 
@@ -60,7 +61,7 @@ class BitacoraSummary(BaseModel):
 # --- BLOQUE 4: CONTEXTO RÁPIDO Y RUTAS (Asistente Móvil) ---
 
 class Recordatorio(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     descripcion: str
     contexto_asociado: str = Field(description="Ej: 'banco', 'supermercado', 'tiempo_libre'")
     completado: bool = False

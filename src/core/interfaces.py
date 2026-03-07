@@ -33,6 +33,14 @@ class IVectorRepository(ABC):
     def indexar_documento(self, doc_id: str, texto: str, metadata: Optional[Dict[str, Any]] = None):
         pass
 
+    @abstractmethod
+    async def async_buscar_recuerdos_relevantes(self, query: str, n_results: int = 3) -> list:
+        pass
+
+    @abstractmethod
+    async def async_agregar_recuerdo(self, texto: str, tipo: str = "general") -> str:
+        pass
+
 class IToolsRepository(ABC):
     @abstractmethod
     def ejecutar_herramienta(self, nombre_tool: str, params: Dict[str, Any]) -> str:

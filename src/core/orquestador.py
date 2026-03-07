@@ -6,6 +6,7 @@ from typing import Dict, Any
 
 # --- MODULARIDAD: Inversión de Dependencias ---
 from src.core.cerebro import CerebroDigital, PensamientoJarvis
+from src.core.memory_manager import MemoryManager
 from src.data import schemas
 from src.core.interfaces import IDataRepository, IVectorRepository, IToolsRepository
 
@@ -21,10 +22,13 @@ class Orquestador:
 
     def __init__(self, data_repo: IDataRepository, vector_repo: IVectorRepository, tools_repo: IToolsRepository):
         # Inyección de Dependencias Explícita
-        self.cerebro = CerebroDigital()
         self.data_repo = data_repo
         self.vector_repo = vector_repo
         self.tools_repo = tools_repo
+        self.cerebro = CerebroDigital()
+        # Pasamos vector_repo al MemoryManager para que escriba en la MISMA
+        # colección que el repositorio vectorial inyectado (corrección DI).
+        self.memory_manager = MemoryManager(vector_repo=self.vector_repo)
 
     async def procesar_mensaje(self, usuario_id: str, texto_limpio: str, audio_path: str = None) -> str:
         """
@@ -49,24 +53,24 @@ class Orquestador:
             # 2. INFERENCIA (El Cerebro Piensa)
             pensamiento: PensamientoJarvis = await self.cerebro.pensar(texto_limpio, contexto_str, audio_path)
 
-            # 3. EJECUCIÓN DE INTENCIÓN (Router Lógico)
+            # 3. PROCESAMIENTO DE MEMORIA SI APLICA
+            if pensamiento.memoria_intencion:
+                await self.memory_manager.procesar_intencion_memoria(
+                    pensamiento.memoria_intencion,
+                    pensamiento.memoria_datos or {}
+                )
+
+            # 4. EJECUCIÓN DE INTENCIÓN (Router Lógico)
             respuesta_final = pensamiento.respuesta_usuario
 
             # FAIL-SAFE: Si la IA falló, no ejecutamos nada más.
             if pensamiento.intencion == "fallback_error":
                 return respuesta_final
 
-            if pensamiento.intencion == "actualizar_memoria":
-                resultado_accion = await self._ejecutar_memoria_async(pensamiento.datos_extra)
-                from src.utils.sanitizador import Sanitizador
-                logger.info(f"Actualización de memoria: {Sanitizador.enmascarar_datos_sensibles(str(resultado_accion))}")
-                if pensamiento.datos_extra and pensamiento.datos_extra.get("accion") == "consultar_proyecto":
-                    respuesta_final += f"\n\n[Sistema - Detalles del Proyecto]:\n{resultado_accion}"
-
             elif pensamiento.intencion == "comando":
-                resultado_tool = self._ejecutar_herramienta(pensamiento.herramienta_sugerida, pensamiento.datos_extra)
-                # Feedback del sistema añadido a la respuesta
-                respuesta_final += f"\n\n[Sistema]: {resultado_tool}"
+                if pensamiento.herramienta_sugerida and pensamiento.herramienta_sugerida != "None":
+                    resultado_tool = self._ejecutar_herramienta(pensamiento.herramienta_sugerida, pensamiento.datos_extra)
+                    respuesta_final += f"\n\n[Sistema]: {resultado_tool}"
 
             # 5. RETORNO (Feedback)
             return respuesta_final
@@ -94,16 +98,25 @@ class Orquestador:
                  un mensaje de fallback temporal.
         """
         try:
+            import pytz
             # Lecturas de DB en paralelo para optimizar
             persona_task = self.data_repo.async_read_data("persona.json", schemas.Persona)
             proyectos_task = self.data_repo.async_read_data("proyectos.json", schemas.GestorProyectos)
-            # OPTIMIZACIÓN: Usamos la función que solo trae el resumen de la bitácora
             bitacora_summary_task = self.data_repo.async_read_bitacora_summary()
             contexto_task = self.data_repo.async_read_data("contexto.json", schemas.GestorContexto)
+            entorno_task = self.data_repo.async_read_data("entorno.json", schemas.Entorno)
             
-            persona, proyectos, bitacora_summary, contexto = await asyncio.gather(
-                persona_task, proyectos_task, bitacora_summary_task, contexto_task
+            persona, proyectos, bitacora_summary, contexto, entorno = await asyncio.gather(
+                persona_task, proyectos_task, bitacora_summary_task, contexto_task, entorno_task
             )
+            
+            # --- CONTEXTO TEMPORAL (Timezone-Aware) ---
+            try:
+                user_tz = pytz.timezone(entorno.zona_horaria)
+            except pytz.UnknownTimeZoneError:
+                user_tz = pytz.timezone("America/Lima") # Fallback
+            
+            hora_local_usuario_str = f"La fecha y hora actual para el usuario es: {datetime.now(user_tz).strftime('%Y-%m-%d %H:%M:%S')}."
             
             # Búsqueda vectorial
             memoria_vectorial = await asyncio.to_thread(
@@ -123,6 +136,9 @@ class Orquestador:
 
             # Formateamos bonito para que Gemini entienda mejor
             return f"""
+            --- CONTEXTO TEMPORAL Y DE ENTORNO (NO MOSTRAR AL USUARIO) ---
+            {hora_local_usuario_str}
+            
             --- PERFIL USUARIO ---
             {persona.model_dump_json(indent=2)}
             

@@ -64,6 +64,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Puente asíncrono hacia el Orquestador.
     """
     if not await seguridad_middleware(update): return
+
+    # FAIL-SAFE: Ignorar tipos de mensaje no soportados (stickers, encuestas, etc.)
+    if not update.message or (not update.message.text and not update.message.voice and not update.message.audio):
+        logger.info("Ignorando mensaje no soportado (posiblemente sticker o vacío).")
+        return
     
     # POKA-YOKE: Rechazar mensajes demasiado largos para evitar abuso/errores
     texto_usuario = update.message.text
