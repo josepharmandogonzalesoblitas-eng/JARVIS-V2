@@ -1,4 +1,4 @@
-google-generativeai
+google-genai
 python-telegram-bot
 pydantic
 schedule

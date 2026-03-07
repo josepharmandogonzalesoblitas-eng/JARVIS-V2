@@ -2,8 +2,9 @@ import os
 import json
 import logging
 import asyncio
-import google.generativeai as genai
-from google.api_core import exceptions as google_exceptions
+from google import genai
+from google.genai import types
+from google.genai.errors import APIError
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -16,9 +17,6 @@ logger = logging.getLogger("cerebro_log")
 API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
     raise ValueError("FATAL: No se encontró GEMINI_API_KEY en .env")
-
-# Configuración Global de Gemini
-genai.configure(api_key=API_KEY)
 
 # --- ESTRUCTURAS DE SALIDA (TYPE-SAFETY) ---
 class PensamientoJarvis(BaseModel):
@@ -33,17 +31,15 @@ class CerebroDigital:
         # Selección dinámica del modelo de Gemini
         self.modelo_nombre = get_best_model_name()
         
-        self.generation_config = {
-            "temperature": 0.7,
-            "top_p": 0.95,
-            "top_k": 40,
-            "max_output_tokens": 8192,
-            "response_mime_type": "application/json", 
-        }
+        # Cliente de la nueva SDK google-genai
+        self.client = genai.Client(api_key=API_KEY)
         
-        self.model = genai.GenerativeModel(
-            model_name=self.modelo_nombre,
-            generation_config=self.generation_config,
+        self.config = types.GenerateContentConfig(
+            temperature=0.7,
+            top_p=0.95,
+            top_k=40,
+            max_output_tokens=8192,
+            response_mime_type="application/json",
             system_instruction=self._get_system_prompt()
         )
 
@@ -99,8 +95,8 @@ class CerebroDigital:
                 prompt_completo += "\n(Se adjuntó una nota de voz del usuario. Escúchala, transcríbela internamente y responde a su contenido.)"
                 # El texto va primero
                 contenidos.append(prompt_completo)
-                # Luego el audio
-                audio_file = await asyncio.to_thread(genai.upload_file, path=audio_file_path)
+                # Luego el audio (usando la nueva SDK file api)
+                audio_file = await asyncio.to_thread(self.client.files.upload, file=audio_file_path)
                 contenidos.append(audio_file)
             else:
                 # Si no hay audio, solo va el texto
@@ -109,8 +105,13 @@ class CerebroDigital:
             logger.info(f"Enviando a Gemini ({len(prompt_completo)} chars texto)...")
             
             # FAIL-SAFE: Timeout para la API de Gemini
+            # La nueva SDK usa client.aio.models.generate_content para async
             response = await asyncio.wait_for(
-                self.model.generate_content_async(contenidos),
+                self.client.aio.models.generate_content(
+                    model=self.modelo_nombre,
+                    contents=contenidos,
+                    config=self.config
+                ),
                 timeout=30.0
             )
             
@@ -134,8 +135,9 @@ class CerebroDigital:
             logger.error("FAIL-SAFE: Timeout esperando respuesta de Gemini.")
             return self._respuesta_fallback("Sistemas de IA sobrecargados. Inténtalo de nuevo en unos momentos.", texto_usuario)
         
-        except (google_exceptions.ServiceUnavailable, google_exceptions.InternalServerError) as e:
-            logger.error(f"FAIL-SAFE: API de Google no disponible. Error: {e}")
+        except APIError as e:
+            # Nuevo manejo de errores de google-genai
+            logger.error(f"FAIL-SAFE: API de Google falló. Error: {e}")
             return self._respuesta_fallback("Sistemas de IA temporalmente desconectados. Reintentando más tarde.", texto_usuario)
 
         except json.JSONDecodeError as e:
