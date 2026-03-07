@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 import os
 import logging
 
@@ -14,9 +14,9 @@ def get_best_model_name():
         if not api_key:
             raise ValueError("No se encontró GEMINI_API_KEY en .env")
 
-        genai.configure(api_key=api_key)
+        client = genai.Client(api_key=api_key)
         
-        available_models = [m.name for m in genai.list_models()]
+        available_models = [m.name for m in client.models.list()]
         
         # Prioridad 1: Buscar el último modelo "flash"
         flash_models = sorted([m for m in available_models if "flash" in m and "models/" in m], reverse=True)
