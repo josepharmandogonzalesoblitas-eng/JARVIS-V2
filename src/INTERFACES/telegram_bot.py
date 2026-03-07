@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 
 # --- MODULARIDAD: Conexión limpia con el núcleo ---
 from src.core.orquestador import Orquestador
+from src.core.repositories import JSONDataRepository, ChromaVectorRepository, DefaultToolsRepository
+from src.utils.sanitizador import Sanitizador
 
 # --- TRAZABILIDAD ---
 # Logger específico para la interfaz
@@ -13,12 +15,20 @@ logger = logging.getLogger("telegram_interface")
 load_dotenv()
 
 # Instancia Global del Orquestador (Singleton Pattern simplificado)
-# Se inicia una vez y se reutiliza.
-jarvis_core = Orquestador()
+# Se inicia una vez y se reutiliza inyectando las dependencias concretas.
+jarvis_core = Orquestador(
+    data_repo=JSONDataRepository(),
+    vector_repo=ChromaVectorRepository(),
+    tools_repo=DefaultToolsRepository()
+)
 
 # Configuración de Seguridad (Zero-Trust) - Poka-Yoke para parseo de enteros
-_user_id_raw = os.getenv("TELEGRAM_USER_ID", "0")
-ALLOWED_USER_ID = int(_user_id_raw) if _user_id_raw and _user_id_raw.isdigit() else 0
+_user_id_raw = os.getenv("TELEGRAM_USER_ID", "")
+if not _user_id_raw or not _user_id_raw.isdigit():
+    logger.critical("FATAL: TELEGRAM_USER_ID no configurado o inválido en .env.")
+    ALLOWED_USER_ID = 0  # Evita que cualquiera pase. 0 no existe en Telegram.
+else:
+    ALLOWED_USER_ID = int(_user_id_raw)
 
 async def seguridad_middleware(update: Update) -> bool:
     """
@@ -54,8 +64,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Puente asíncrono hacia el Orquestador.
     """
     if not await seguridad_middleware(update): return
-
+    
+    # POKA-YOKE: Rechazar mensajes demasiado largos para evitar abuso/errores
     texto_usuario = update.message.text
+    if texto_usuario and len(texto_usuario) > 2048:
+        await update.message.reply_text("Tu mensaje es demasiado largo. Intenta ser más breve.")
+        return
+
+    # SANITIZACIÓN: Limpieza y validación PREVIA a cualquier procesamiento
+    texto_limpio = Sanitizador.limpiar_texto(texto_usuario) if texto_usuario else ""
+    if texto_limpio and not Sanitizador.validar_seguridad(texto_limpio):
+        logger.warning(f"Intento de inyección bloqueado PREVIO al orquestador por usuario {ALLOWED_USER_ID}")
+        await update.message.reply_text("⛔ Sistema de seguridad activado: Input rechazado.")
+        return
+
     audio_path = None
     
     # Manejo de notas de voz o audios
@@ -78,8 +100,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         # --- ACPLAMIENTO DÉBIL ---
-        # Delegamos toda la lógica al Orquestador.
-        respuesta = await jarvis_core.procesar_mensaje(str(ALLOWED_USER_ID), texto_usuario, audio_path)
+        # Delegamos toda la lógica al Orquestador, pero ya con el texto limpio
+        respuesta = await jarvis_core.procesar_mensaje(str(ALLOWED_USER_ID), texto_limpio, audio_path)
         
         # Respuesta al usuario
         await update.message.reply_text(respuesta)
@@ -116,4 +138,16 @@ def iniciar_bot():
     logger.info("🤖 Interfaz de Telegram lista y escuchando (Polling)...")
     
     # Ejecución Bloqueante (Main Loop)
-    application.run_polling()
+    # Iniciamos el CRON justo después de que el loop asíncrono de Telegram arranca, 
+    # utilizando el hook post_init de la aplicación.
+    async def _post_init(app: ApplicationBuilder):
+        from src.core.cron import iniciar_cron
+        iniciar_cron()
+        
+    application.post_init = _post_init
+    
+    try:
+        application.run_polling()
+    finally:
+        from src.core.cron import detener_cron
+        detener_cron()

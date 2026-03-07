@@ -51,7 +51,7 @@ class ToolAgenda:
                     self.creds = None
 
     def crear_evento_calendar(self, resumen: str, fecha_inicio_iso: str, duracion_minutos: int = 60, descripcion: str = "") -> str:
-        """Crea un evento en Google Calendar."""
+        """Crea un evento en Google Calendar, previniendo duplicados (Idempotencia)."""
         if not self.creds:
             return "Error: No hay conexión con Google Calendar (falta token.json)."
             
@@ -61,49 +61,60 @@ class ToolAgenda:
             inicio = datetime.datetime.fromisoformat(fecha_inicio_iso.replace('Z', '+00:00'))
             fin = inicio + datetime.timedelta(minutes=duracion_minutos)
             
+            # IDEMPOTENCIA: Buscar eventos existentes en una ventana de +/- 5 minutos
+            time_min = (inicio - datetime.timedelta(minutes=5)).isoformat() + "Z"
+            time_max = (inicio + datetime.timedelta(minutes=5)).isoformat() + "Z"
+            
+            existing_events = service.events().list(
+                calendarId='primary',
+                timeMin=time_min,
+                timeMax=time_max,
+                q=resumen, # Filtrar por el mismo resumen
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+            
+            if existing_events.get('items'):
+                logger.warning(f"IDEMPOTENCIA: Evento '{resumen}' duplicado detectado. No se creará uno nuevo.")
+                return f"⚠️ Ya existe un evento similar agendado para esa hora: '{resumen}'."
+
             evento = {
-              'summary': resumen,
-              'description': descripcion,
-              'start': {
-                'dateTime': inicio.isoformat(),
-                'timeZone': 'UTC',
-              },
-              'end': {
-                'dateTime': fin.isoformat(),
-                'timeZone': 'UTC',
-              },
-              'reminders': {
-                'useDefault': False,
-                'overrides': [
-                  {'method': 'popup', 'minutes': 10},
-                ],
-              },
+                'summary': resumen,
+                'description': descripcion,
+                'start': {'dateTime': inicio.isoformat(), 'timeZone': 'America/Lima'},
+                'end': {'dateTime': fin.isoformat(), 'timeZone': 'America/Lima'},
+                'reminders': {'useDefault': False, 'overrides': [{'method': 'popup', 'minutes': 10}]},
             }
             
             event = service.events().insert(calendarId='primary', body=evento).execute()
-            return f"✅ Evento '{resumen}' agendado en Google Calendar. Enlace: {event.get('htmlLink')}"
+            return f"✅ Evento '{resumen}' agendado. Enlace: {event.get('htmlLink')}"
+
         except Exception as e:
             logger.error(f"Error en Calendar: {e}")
             return f"❌ Fallo al agendar en Calendar: {str(e)}"
 
     def crear_tarea(self, titulo: str, notas: str = "", fecha_vencimiento_iso: Optional[str] = None) -> str:
-        """Añade una tarea a Google Tasks."""
+        """Añade una tarea a Google Tasks, previniendo duplicados (Idempotencia)."""
         if not self.creds:
             return "Error: No hay conexión con Google Tasks (falta token.json)."
             
         try:
             service = build('tasks', 'v1', credentials=self.creds)
             
-            tarea = {
-                'title': titulo,
-                'notes': notas
-            }
+            # IDEMPOTENCIA: Buscar si ya existe una tarea con el mismo título
+            task_list = service.tasks().list(tasklist='@default', showCompleted=False).execute()
+            for task in task_list.get('items', []):
+                if task.get('title', '').strip().lower() == titulo.strip().lower():
+                    logger.warning(f"IDEMPOTENCIA: Tarea '{titulo}' duplicada detectada. No se creará una nueva.")
+                    return f"⚠️ Ya existe una tarea pendiente con ese nombre: '{titulo}'."
+
+            tarea = {'title': titulo, 'notes': notas}
             if fecha_vencimiento_iso:
                 tarea['due'] = fecha_vencimiento_iso
 
-            # '17t1H8K4sS5mGj6k' @default es la lista principal de tareas.
             result = service.tasks().insert(tasklist='@default', body=tarea).execute()
             return f"✅ Tarea '{titulo}' añadida a Google Tasks."
+            
         except Exception as e:
             logger.error(f"Error en Tasks: {e}")
             return f"❌ Fallo al añadir tarea: {str(e)}"
