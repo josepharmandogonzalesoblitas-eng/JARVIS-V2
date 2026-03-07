@@ -58,12 +58,34 @@ class ChromaVectorRepository(IVectorRepository):
 
             embedding_fn = GoogleGenAIEmbeddingFunction(api_key=api_key)
             self.client = chromadb.PersistentClient(path=self.persist_directory)
-            self.collection = self.client.get_or_create_collection(
-                name="recuerdos_jarvis",
-                embedding_function=embedding_fn,
-                metadata={"hnsw:space": "cosine"}
-            )
-            logger.info("ChromaVectorRepository inicializado correctamente.")
+
+            try:
+                # Intento normal: obtener o crear con la función correcta
+                self.collection = self.client.get_or_create_collection(
+                    name="recuerdos_jarvis",
+                    embedding_function=embedding_fn,
+                    metadata={"hnsw:space": "cosine"}
+                )
+                logger.info("ChromaVectorRepository inicializado correctamente.")
+            except Exception as embed_conflict:
+                # FAIL-SAFE: Conflicto de embedding function (colección antigua con fn diferente)
+                # Solución: eliminar colección obsoleta y recrear con la función nueva
+                if "embedding function" in str(embed_conflict).lower() or "conflict" in str(embed_conflict).lower():
+                    logger.warning(
+                        f"Conflicto de embedding function detectado. "
+                        f"Recreando colección 'recuerdos_jarvis' con la función correcta. "
+                        f"Los recuerdos anteriores serán re-indexados en la próxima sesión."
+                    )
+                    self.client.delete_collection("recuerdos_jarvis")
+                    self.collection = self.client.get_or_create_collection(
+                        name="recuerdos_jarvis",
+                        embedding_function=embedding_fn,
+                        metadata={"hnsw:space": "cosine"}
+                    )
+                    logger.info("ChromaVectorRepository re-inicializado con embedding function correcta.")
+                else:
+                    raise embed_conflict
+
         except Exception as e:
             logger.error(f"Error inicializando ChromaVectorRepository: {e}")
             self.collection = None
