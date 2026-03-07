@@ -1,5 +1,8 @@
 import google.generativeai as genai
 import os
+import logging
+
+logger = logging.getLogger("model_loader")
 
 def get_best_model_name():
     """
@@ -29,12 +32,13 @@ def get_best_model_name():
         return "gemini-1.5-flash"
 
     except Exception as e:
-        print(f"Error al listar modelos de Gemini: {e}")
-        # Fallback a un modelo conocido si la API falla
+        logger.warning(f"No se pudieron listar los modelos de Gemini ({e}). Usando fallback 'gemini-1.5-flash'.")
         return "gemini-1.5-flash"
 
 if __name__ == '__main__':
     # Esto es para probar el script directamente
+    logging.basicConfig(level=logging.INFO)
+    from dotenv import load_dotenv
     load_dotenv()
     selected_model = get_best_model_name()
-    print(f"Modelo seleccionado: {selected_model}")
+    logger.info(f"Modelo de Gemini seleccionado: {selected_model}")

@@ -1,13 +1,13 @@
 import logging
 import json
+import asyncio
 from datetime import datetime
 from typing import Dict, Any
 
-# --- MODULARIDAD: Importamos componentes aislados ---
+# --- MODULARIDAD: Inversión de Dependencias ---
 from src.core.cerebro import CerebroDigital, PensamientoJarvis
-from src.data import db_handler, schemas
-from src.data.vector_db import vector_db
-from src.utils.sanitizador import Sanitizador
+from src.data import schemas
+from src.core.interfaces import IDataRepository, IVectorRepository, IToolsRepository
 
 # --- TRAZABILIDAD ---
 logger = logging.getLogger("orquestador")
@@ -16,48 +16,50 @@ class Orquestador:
     """
     Controlador Central (MVC Pattern).
     Responsabilidad: Coordinar el flujo de datos entre IO, Lógica y Persistencia.
-    Principios: Fail-Safe, Atomicidad, Trazabilidad.
+    Principios: Fail-Safe, Atomicidad, Trazabilidad, SOLID (Inyección de Dependencias).
     """
 
-    def __init__(self):
-        # Inyección de Dependencias implícita
+    def __init__(self, data_repo: IDataRepository, vector_repo: IVectorRepository, tools_repo: IToolsRepository):
+        # Inyección de Dependencias Explícita
         self.cerebro = CerebroDigital()
-        
-        # Inicializamos DB por si acaso (Idempotencia)
-        db_handler.init_db()
+        self.data_repo = data_repo
+        self.vector_repo = vector_repo
+        self.tools_repo = tools_repo
 
-    async def procesar_mensaje(self, usuario_id: str, texto_raw: str, audio_path: str = None) -> str:
+    async def procesar_mensaje(self, usuario_id: str, texto_limpio: str, audio_path: str = None) -> str:
         """
         Flujo principal de ejecución (Pipeline) ASÍNCRONO.
-        Retorna la respuesta final para el usuario.
-        Acepta un archivo de audio opcional.
+        Recibe texto ya sanitizado desde la interfaz.
+        
+        Args:
+            usuario_id (str): ID del remitente autorizado.
+            texto_limpio (str): Mensaje de texto sin caracteres maliciosos ni inyecciones.
+            audio_path (str, optional): Ruta temporal del archivo de audio si aplica. Defaults to None.
+            
+        Returns:
+            str: La respuesta final a enviar al usuario en Telegram.
         """
         try:
-            # 1. SANITIZACIÓN (Zero-Trust)
-            texto_limpio = Sanitizador.limpiar_texto(texto_raw) if texto_raw else ""
-            if texto_limpio and not Sanitizador.validar_seguridad(texto_limpio):
-                logger.warning(f"Intento de inyección bloqueado usuario {usuario_id}")
-                return "⛔ Sistema de seguridad activado: Input rechazado por contener patrones maliciosos."
-
             if not texto_limpio and not audio_path:
                 return "..." # Ignorar mensajes vacíos
 
-            # 2. CARGA DE CONTEXTO (RAG - Retrieval Augmented Generation)
-            # Leemos el estado actual para que el cerebro no alucine.
-            contexto_str = self._construir_contexto(texto_limpio)
+            # 1. CARGA DE CONTEXTO (RAG) - ASÍNCRONO
+            contexto_str = await self._construir_contexto_async(texto_limpio)
 
-            # 3. INFERENCIA (El Cerebro Piensa)
+            # 2. INFERENCIA (El Cerebro Piensa)
             pensamiento: PensamientoJarvis = await self.cerebro.pensar(texto_limpio, contexto_str, audio_path)
 
-            # 4. EJECUCIÓN DE INTENCIÓN (Switch Case Lógico)
+            # 3. EJECUCIÓN DE INTENCIÓN (Router Lógico)
             respuesta_final = pensamiento.respuesta_usuario
 
+            # FAIL-SAFE: Si la IA falló, no ejecutamos nada más.
+            if pensamiento.intencion == "fallback_error":
+                return respuesta_final
+
             if pensamiento.intencion == "actualizar_memoria":
-                resultado_accion = self._ejecutar_memoria(pensamiento.datos_extra)
-                # Si hubo éxito interno, quizás queramos anexarlo a la respuesta, 
-                # pero por ahora confiamos en la respuesta generada por la IA.
-                logger.info(f"Actualización de memoria: {resultado_accion}")
-                # Para el Lazy Loading de proyectos, anexamos el resultado al usuario
+                resultado_accion = await self._ejecutar_memoria_async(pensamiento.datos_extra)
+                from src.utils.sanitizador import Sanitizador
+                logger.info(f"Actualización de memoria: {Sanitizador.enmascarar_datos_sensibles(str(resultado_accion))}")
                 if pensamiento.datos_extra and pensamiento.datos_extra.get("accion") == "consultar_proyecto":
                     respuesta_final += f"\n\n[Sistema - Detalles del Proyecto]:\n{resultado_accion}"
 
@@ -75,34 +77,43 @@ class Orquestador:
             logger.error(f"Error crítico en orquestador: {e}", exc_info=True)
             return f"⚠️ Error del Sistema: {str(e)}. Mis protocolos de recuperación están activos."
 
-    def _construir_contexto(self, texto_usuario: str) -> str:
+    async def _construir_contexto_async(self, texto_usuario: str) -> str:
         """
-        Recopila los JSONs, busca en la BD vectorial y los convierte en texto para el prompt.
-        Aplica: Read-Only Access (no modifica nada).
+        Recopila de forma concurrente el contexto necesario para el prompt de la IA.
+        
+        Extrae datos de la persona, proyectos activos, resumen de la bitácora
+        y realiza una búsqueda semántica en la base de datos vectorial.
+        
+        Args:
+            texto_usuario (str): El mensaje ingresado por el usuario, usado para
+                                la búsqueda en la base vectorial.
+                                
+        Returns:
+            str: Un string formateado que contiene todo el contexto comprimido,
+                 listo para ser inyectado en el LLM. En caso de error, devuelve
+                 un mensaje de fallback temporal.
         """
         try:
-            # Leemos con Type-Safety gracias a Pydantic
-            persona = db_handler.read_data("persona.json", schemas.Persona)
-            proyectos = db_handler.read_data("proyectos.json", schemas.GestorProyectos)
-            gestor_bitacora = db_handler.read_data("bitacora.json", schemas.GestorBitacora)
-            contexto = db_handler.read_data("contexto.json", schemas.GestorContexto)
+            # Lecturas de DB en paralelo para optimizar
+            persona_task = self.data_repo.async_read_data("persona.json", schemas.Persona)
+            proyectos_task = self.data_repo.async_read_data("proyectos.json", schemas.GestorProyectos)
+            # OPTIMIZACIÓN: Usamos la función que solo trae el resumen de la bitácora
+            bitacora_summary_task = self.data_repo.async_read_bitacora_summary()
+            contexto_task = self.data_repo.async_read_data("contexto.json", schemas.GestorContexto)
             
-            # Buscamos en ChromaDB recuerdos relevantes para ESTE mensaje
-            memoria_vectorial = vector_db.buscar_contexto(texto_usuario, n_results=3)
+            persona, proyectos, bitacora_summary, contexto = await asyncio.gather(
+                persona_task, proyectos_task, bitacora_summary_task, contexto_task
+            )
             
-            # Extraer solo el día actual o un registro vacío
-            bitacora_hoy = gestor_bitacora.dia_actual.model_dump_json(indent=2) if gestor_bitacora.dia_actual else "No hay registro de hoy."
+            # Búsqueda vectorial
+            memoria_vectorial = await asyncio.to_thread(
+                self.vector_repo.buscar_contexto, texto_usuario, 3
+            )
             
-            # Analizar el histórico si hay suficientes días
-            historico_keys = list(gestor_bitacora.historico_dias.keys())
-            tendencia = "Sin datos suficientes."
-            if len(historico_keys) >= 3:
-                ultimos_3 = [gestor_bitacora.historico_dias[k].nivel_energia for k in historico_keys[-3:]]
-                promedio = sum(ultimos_3) / len(ultimos_3)
-                tendencia = f"Promedio energía últimos días: {promedio:.1f}/10"
+            bitacora_hoy_str = bitacora_summary.dia_actual.model_dump_json(indent=2) if bitacora_summary.dia_actual else "No hay registro de hoy."
+            tendencia = bitacora_summary.tendencia_energia
             
             # --- COMPRESIÓN DE CONTEXTO (Proyectos) ---
-            # En lugar de enviar todo el JSON, enviamos un resumen para ahorrar tokens.
             resumen_proyectos = []
             for nombre, p in proyectos.proyectos_activos.items():
                 tareas_pendientes = len([t for t in p.tareas_pendientes if t.estado != 'completado'])
@@ -120,7 +131,7 @@ class Orquestador:
             (Para ver detalles completos, usa intención 'actualizar_memoria', archivo 'proyectos', accion 'consultar_proyecto' con {{"nombre": "Nombre del proyecto"}})
             
             --- ESTADO DE HOY ({datetime.now().strftime('%Y-%m-%d')}) ---
-            {bitacora_hoy}
+            {bitacora_hoy_str}
             Tendencia Reciente: {tendencia}
             
             --- CONTEXTO Y RECORDATORIOS (MÓVIL) ---
@@ -132,18 +143,28 @@ class Orquestador:
             logger.warning(f"No se pudo cargar contexto completo: {e}")
             return "Contexto no disponible temporalmente."
 
-    def _ejecutar_memoria(self, datos: Dict[str, Any]) -> str:
+    async def _ejecutar_memoria_async(self, datos: Dict[str, Any]) -> str:
         """
-        Maneja la persistencia de datos solicitada por la IA.
-        Delega a la herramienta de memoria.
+        Maneja la persistencia de datos de forma asíncrona usando el repositorio inyectado.
+        
+        Args:
+            datos (Dict[str, Any]): Diccionario con los detalles de la operación
+                                    a realizar en memoria (ej. actualizar perfil, bitácora).
+                                    
+        Returns:
+            str: Resultado de la operación de memoria que se devolverá o mostrará al usuario.
         """
-        from src.TOOLS.tool_memory import ejecutar_memoria
-        return ejecutar_memoria(datos)
+        return await self.tools_repo.async_ejecutar_memoria(datos)
 
     def _ejecutar_herramienta(self, nombre_tool: str, params: Dict[str, Any]) -> str:
         """
-        Router para ejecución de scripts/tools.
-        Aplica: Modularidad (Tools separadas).
+        Router para la ejecución de scripts/tools locales usando el repositorio inyectado.
+        
+        Args:
+            nombre_tool (str): Nombre de la herramienta a ejecutar (ej. 'buscar_web', 'google_calendar').
+            params (Dict[str, Any]): Parámetros requeridos por la herramienta extraídos por el LLM.
+            
+        Returns:
+            str: Feedback del sistema tras la ejecución de la herramienta.
         """
-        from src.TOOLS.tool_system import ejecutar_herramienta_sistema
-        return ejecutar_herramienta_sistema(nombre_tool, params)
+        return self.tools_repo.ejecutar_herramienta(nombre_tool, params)

@@ -49,6 +49,14 @@ class GestorBitacora(BaseModel):
     historico_dias: Dict[str, RegistroDiario] = Field(default_factory=dict)
     dia_actual: Optional[RegistroDiario] = None
 
+class BitacoraSummary(BaseModel):
+    """
+    Modelo optimizado para contener solo la información esencial de la bitácora
+    para el prompt de la IA, reduciendo la carga en memoria.
+    """
+    dia_actual: Optional[RegistroDiario] = None
+    tendencia_energia: str = "Sin datos suficientes."
+
 # --- BLOQUE 4: CONTEXTO RÁPIDO Y RUTAS (Asistente Móvil) ---
 
 class Recordatorio(BaseModel):

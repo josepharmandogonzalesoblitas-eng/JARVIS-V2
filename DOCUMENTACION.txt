@@ -34,6 +34,15 @@ ROADMAP CUMPLIDO (V2.2)
 ✅ Sistema de Sanitización de Entradas: Se ha implementado un sistema de sanitización para evitar ataques de inyección de código.
 ✅ Mejoras en el sistema de memoria: Se ha mejorado el sistema de memoria para un mejor rendimiento y una mayor precisión.
 
+ROADMAP CUMPLIDO - AUDITORÍA STAFF ENGINEER (V2.5)
+--------------------------------------------------------
+✅ Arquitectura SOLID: Inversión de dependencias implementada mediante Interfaces y Repositorios (IData, IVector, ITools) permitiendo pruebas aisladas.
+✅ Resiliencia y Concurrencia: Reescritura del sistema CRON a puramente Asíncrono (sin hilos cruzados), implementando candados `asyncio.Lock` para eliminar Race Conditions.
+✅ Fail-Safe y Graceful Degradation: Si la API de Google Gemini sufre una caída (500) o timeout, Jarvis degradará a comandos locales para no quedar totalmente inutilizado.
+✅ Trazabilidad e ISO 27001: Sustitución de `prints` por un sistema de Logging Rotativo que enmascara automáticamente información sensible (Data Masking) como tarjetas o emails.
+✅ Optimización Big-O y Recursos: Migración de ChromaDB para usar Google Embeddings API, reduciendo drásticamente la carga de RAM de ~80MB a casi O(1).
+✅ Portabilidad y CI/CD: Refactorización a Docker Multi-stage build con Least Privilege (usuario `appuser`), límites de hardware en Docker Compose (evitando OOM Killer) y pipeline CI en Github Actions validado por +39 pruebas unitarias.
+
 5. FUTURO: OPORTUNIDADES DE MEJORA (V3)
 --------------------------------------------------------
 ✅ Reconocimiento OCR y de Imágenes enviando fotos por Telegram.

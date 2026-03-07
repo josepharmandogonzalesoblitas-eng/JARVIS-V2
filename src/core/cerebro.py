@@ -1,7 +1,9 @@
 import os
 import json
 import logging
+import asyncio
 import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -90,49 +92,86 @@ class CerebroDigital:
             Responder en JSON estricto.
             """
 
-            contenidos = [prompt_completo]
+            contenidos = []
             
             if audio_file_path and os.path.exists(audio_file_path):
                 logger.info(f"Subiendo audio a Gemini: {audio_file_path}")
-                # Subir archivo usando File API de Gemini (necesario para audios grandes)
-                audio_file = genai.upload_file(path=audio_file_path)
+                prompt_completo += "\n(Se adjuntó una nota de voz del usuario. Escúchala, transcríbela internamente y responde a su contenido.)"
+                # El texto va primero
+                contenidos.append(prompt_completo)
+                # Luego el audio
+                audio_file = await asyncio.to_thread(genai.upload_file, path=audio_file_path)
                 contenidos.append(audio_file)
-                prompt_completo += " (Se adjuntó nota de voz del usuario. Escúchala, transpóngala internamente y responde a su contenido.)"
+            else:
+                # Si no hay audio, solo va el texto
+                contenidos.append(prompt_completo)
 
             logger.info(f"Enviando a Gemini ({len(prompt_completo)} chars texto)...")
-            response = await self.model.generate_content_async(contenidos)
+            
+            # FAIL-SAFE: Timeout para la API de Gemini
+            response = await asyncio.wait_for(
+                self.model.generate_content_async(contenidos),
+                timeout=30.0
+            )
             
             # --- CORRECCIÓN MATRIOSKA (Edge Case Handling) ---
             try:
                 datos_raw = json.loads(response.text)
-            except Exception:
-                # A veces Gemini manda markdown ```json ... ``` aunque le digas que no
-                limpio = response.text.replace("```json", "").replace("```", "")
+            except json.JSONDecodeError:
+                limpio = response.text.strip().replace("```json", "").replace("```", "")
                 datos_raw = json.loads(limpio)
 
-            # Si Gemini lo envolvió, lo desenvolvemos
             if "pensamiento_jarvis" in datos_raw:
                 datos_raw = datos_raw["pensamiento_jarvis"]
             elif "PensamientoJarvis" in datos_raw:
                 datos_raw = datos_raw["PensamientoJarvis"]
             
-            # Validación Pydantic
             pensamiento = PensamientoJarvis(**datos_raw)
-            
             logger.info(f"Inferencia exitosa. Intención: {pensamiento.intencion}")
             return pensamiento
 
+        except asyncio.TimeoutError:
+            logger.error("FAIL-SAFE: Timeout esperando respuesta de Gemini.")
+            return self._respuesta_fallback("Sistemas de IA sobrecargados. Inténtalo de nuevo en unos momentos.", texto_usuario)
+        
+        except (google_exceptions.ServiceUnavailable, google_exceptions.InternalServerError) as e:
+            logger.error(f"FAIL-SAFE: API de Google no disponible. Error: {e}")
+            return self._respuesta_fallback("Sistemas de IA temporalmente desconectados. Reintentando más tarde.", texto_usuario)
+
         except json.JSONDecodeError as e:
             logger.error(f"Error JSON: {e} - Texto recibido: {response.text if 'response' in locals() else 'Nada'}")
-            return self._respuesta_fallback("Error mental: No pude estructurar mi pensamiento.")
+            return self._respuesta_fallback("Error mental: No pude estructurar mi pensamiento. La IA devolvió un formato inválido.", texto_usuario)
             
         except Exception as e:
-            logger.error(f"FALLO CRÍTICO EN CEREBRO: {e}")
-            return self._respuesta_fallback(f"Error interno: {str(e)}")
+            logger.error(f"FALLO CRÍTICO EN CEREBRO: {type(e).__name__}: {e}", exc_info=True)
+            return self._respuesta_fallback(f"Error interno del sistema: {str(e)}", texto_usuario)
 
-    def _respuesta_fallback(self, mensaje_error: str) -> PensamientoJarvis:
+    def _respuesta_fallback(self, mensaje_error: str, texto_usuario: str = "") -> PensamientoJarvis:
+        """
+        Graceful Degradation:
+        Si Gemini falla, evaluamos si el texto del usuario era un comando de consulta local (ej. estado de memoria o ayuda)
+        o un saludo básico, para no dejar al usuario completamente bloqueado.
+        """
+        texto_lower = texto_usuario.lower()
+        if "hora" in texto_lower:
+            return PensamientoJarvis(
+                intencion="comando",
+                razonamiento="Fallback: Respuesta local a consulta de hora.",
+                respuesta_usuario="Mis sistemas de IA están caídos, pero te puedo decir la hora local.",
+                herramienta_sugerida="consultar_hora",
+                datos_extra={}
+            )
+        elif "sistema" in texto_lower or "estado" in texto_lower:
+            return PensamientoJarvis(
+                intencion="comando",
+                razonamiento="Fallback: Respuesta local a consulta de estado del sistema.",
+                respuesta_usuario="Sistemas de IA desconectados. Aquí tienes el diagnóstico local:",
+                herramienta_sugerida="estado_sistema",
+                datos_extra={}
+            )
+            
         return PensamientoJarvis(
-            intencion="charla",
-            razonamiento="Fallo del sistema",
+            intencion="fallback_error",
+            razonamiento=f"Fallo del sistema: {mensaje_error}",
             respuesta_usuario=mensaje_error
         )

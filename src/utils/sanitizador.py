@@ -1,88 +1,95 @@
-import re
-import unicodedata
-import logging
 from typing import Optional
-
-# --- PRINCIPIO: TRAZABILIDAD ---
-# Configuramos un logger específico para seguridad
-logger = logging.getLogger("security_audit")
+import re
 
 class Sanitizador:
     """
-    Módulo estático de limpieza y validación de inputs.
-    Aplica principios: Zero-Trust, Poka-Yoke, Fail-Safe.
+    Clase centralizada para toda la sanitización de inputs.
+    Aplica el principio de Zero-Trust.
     """
+    
+    # Expresiones regulares para sanitización y seguridad
+    PATRONES_MALICIOSOS = re.compile(
+        # Prompt Injection
+        r"\b(ignora|olvida|ignorar|olvidar|ignore|forget)\s+(las|tus\s+)?(instrucciones|todo)\b|"
+        r"act(u|ú)a\s+como|eres\s+un\s+nuevo|"
+        # SQL Injection Keywords. Look for keywords followed by expected syntax.
+        r"\b(SELECT\s(.+)\sFROM|DROP\s+(TABLE|DATABASE)|INSERT\s+INTO|UPDATE\s+(.+)\s+SET|DELETE\s+FROM|UNION\s+ALL\s+SELECT|OR\s+\d+\s*=\s*\d+)\b|"
+        # SQL comments/terminators that are more specific to avoid false positives on '#'
+        r"(;\s*--|#\s.*$)|"
+        # XSS
+        r"<script.*?>.*?</script>|"
+        # Command Injection - aggressively block python dangerous functions
+        r"\b(os\.system|subprocess\.|eval|exec)\b|"
+        # Common attacks
+        r"\b(DAN|confidencial|secreto)\b",
+        re.IGNORECASE | re.DOTALL
+    )
+    REPETIDOS_PUNTUACION = re.compile(r"([,.?!])\1+")
+    ESPACIOS_MULTI = re.compile(r" +")
 
-    # Constantes de seguridad (Magic Numbers fuera del código lógico - DRY/Configurabilidad)
-    MAX_INPUT_LENGTH = 4000  # Limite de tokens/caracteres para evitar DoS en la LLM
-    PATRONES_PELIGROSOS = [
-        r";\s*rm\s+-rf",      # Intento de borrado en Linux
-        r"DROP\s+TABLE",      # SQL Injection clásica (por si acaso)
-        r"<script>",          # XSS (si alguna vez tienes dashboard web)
-        r"\{\{.*\}\}",        # Template Injection (Jinja2/Django)
-    ]
+    MAX_INPUT_LENGTH = 2048
 
     @staticmethod
     def limpiar_texto(texto: Optional[str]) -> str:
         """
-        Punto de entrada principal.
-        Aplica:
-        1. Type-Safety: Maneja None.
-        2. Normalización Unicode: Evita errores de encoding (NFKC).
-        3. Trimming: Elimina espacios basura.
-        4. Zero-Trust: Filtra caracteres de control no imprimibles.
+        Limpia un string de espacios extra, tabulaciones, saltos de línea y 
+        signos de puntuación repetidos.
         """
-        # 1. Edge Case: Input nulo o no string
-        if texto is None or not isinstance(texto, str):
-            logger.warning("Input nulo o inválido recibido en sanitizador.")
+        if not texto:
             return ""
-
-        # 2. Normalización Unicode (NFKC)
-        # Convierte caracteres "raros" a su equivalente estándar.
-        # Ej: "ℍ" -> "H", "½" -> "1/2". Crucial para NLP.
-        texto_norm = unicodedata.normalize('NFKC', texto)
-
-        # 3. Eliminar caracteres de control (ASCII 0-31) excepto saltos de línea
-        # Regex eficiente (Big-O lineal)
-        texto_limpio = "".join(ch for ch in texto_norm if unicodedata.category(ch)[0] != "C" or ch in "\n\t")
-
-        # 4. Trimming de espacios múltiples (Clean Data)
-        texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()
-
-        # 5. Fail-Safe: Si después de limpiar no queda nada
-        if not texto_limpio:
-            return ""
-
+        
+        # 1. Normalizar saltos de línea y tabulaciones a espacios
+        texto_limpio = re.sub(r"[\n\r\t]+", " ", texto)
+        # 2. Quitar espacios al principio y al final
+        texto_limpio = texto_limpio.strip()
+        # 3. Reemplazar múltiples espacios por uno solo
+        texto_limpio = Sanitizador.ESPACIOS_MULTI.sub(" ", texto_limpio)
+        # 4. Reemplazar puntuación repetida (ej. "..." -> ".")
+        texto_limpio = Sanitizador.REPETIDOS_PUNTUACION.sub(r"\1", texto_limpio)
+        
         return texto_limpio
 
     @staticmethod
     def validar_seguridad(texto: str) -> bool:
         """
-        Verifica si el texto cumple con las normas de seguridad.
-        Retorna True si es seguro, False si se rechaza.
+        Valida que el texto no exceda la longitud máxima y no contenga patrones
+        maliciosos.
+        Retorna True si es seguro, False si no lo es.
         """
-        # 1. DoS Protection (Longitud excesiva)
         if len(texto) > Sanitizador.MAX_INPUT_LENGTH:
-            logger.warning(f"Input rechazado por longitud excesiva: {len(texto)} caracteres.")
             return False
-
-        # 2. Detección de patrones maliciosos (Basic Injection Check)
-        for patron in Sanitizador.PATRONES_PELIGROSOS:
-            if re.search(patron, texto, re.IGNORECASE):
-                logger.critical(f"ALERTA DE SEGURIDAD: Patrón malicioso detectado -> {patron}")
-                return False
-
+        if Sanitizador.PATRONES_MALICIOSOS.search(texto):
+            return False
         return True
-
+        
     @staticmethod
     def sanitizar_nombre_archivo(nombre: str) -> str:
         """
-        Específico para cuando Jarvis necesite guardar/leer archivos.
-        Evita 'Path Traversal' (../).
+        Elimina caracteres peligrosos de un nombre de archivo para evitar
+        Path Traversal y otros ataques.
         """
-        # Elimina todo lo que no sea alfanumérico, guiones o puntos
-        nombre_seguro = re.sub(r'[^\w\-.]', '_', nombre)
-        # Evita doble punto (..) para navegación de directorios
-        while '..' in nombre_seguro:
-            nombre_seguro = nombre_seguro.replace('..', '.')
-        return nombre_seguro.strip('_')
+        return re.sub(r'[\\/*?:"<>|]', "", nombre)
+
+    @staticmethod
+    def enmascarar_datos_sensibles(texto: str) -> str:
+        """
+        Aplica Data Masking (ISO 27001) para ofuscar información personal o
+        datos sensibles (emails, números de teléfono, tarjetas, DNIs)
+        antes de enviar el texto al log del sistema.
+        
+        Args:
+            texto (str): El string crudo capturado del usuario o sistema.
+            
+        Returns:
+            str: El string con los datos sensibles sustituidos por '[ENMASCARADO]'.
+        """
+        if not texto:
+            return ""
+            
+        # Enmascarar Emails
+        texto = re.sub(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', '[EMAIL]', texto)
+        
+        # Enmascarar posibles números de tarjetas de crédito o DNIs/Teléfonos largos
+        texto = re.sub(r'\b(?:\d[ -]*?){8,16}\b', '[NUMERO_OCULTO]', texto)
+        
+        return texto
