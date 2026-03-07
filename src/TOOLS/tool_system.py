@@ -14,13 +14,24 @@ logger = logging.getLogger("tool_system")
 
 from duckduckgo_search import DDGS
 
+import pytz
+
 def ejecutar_herramienta_sistema(nombre: str, params: Dict[str, Any]) -> str:
     """
     Router principal para herramientas de sistema operativo y utilidades.
     """
     try:
         if nombre == "consultar_hora":
-            return f"La hora del sistema es {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+            # Usar el timezone del entorno del usuario para dar la hora correcta
+            from src.data import db_handler, schemas
+            try:
+                entorno = db_handler.read_data("entorno.json", schemas.Entorno)
+                user_tz = pytz.timezone(entorno.zona_horaria)
+            except Exception:
+                user_tz = pytz.timezone("America/Lima") # Fallback
+            
+            hora_correcta = datetime.now(user_tz)
+            return f"La hora actual es {hora_correcta.strftime('%Y-%m-%d %H:%M:%S')}."
             
         elif nombre == "estado_sistema":
             cpu = psutil.cpu_percent(interval=0.5)
@@ -38,7 +49,11 @@ def ejecutar_herramienta_sistema(nombre: str, params: Dict[str, Any]) -> str:
                 
             logger.info(f"Buscando en la web: {query}")
             resultados = []
-            with DDGS() as ddgs:
+            # Añadir User-Agent para evitar bloqueos
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+            }
+            with DDGS(headers=headers) as ddgs:
                 # Buscamos los 3 primeros resultados
                 for r in ddgs.text(query, max_results=3):
                     resultados.append(f"- {r.get('title')}: {r.get('body')} ({r.get('href')})")
