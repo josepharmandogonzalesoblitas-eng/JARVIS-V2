@@ -130,6 +130,18 @@ LIMITACIONES ACTUALES (LO QUE NO PUEDE HACER)
 - Respuesta en Notas de Voz (Sintetizador ElevenLabs / OpenAI TTS).
 - Integración con IFTTT para automatizaciones complejas.
 
+SOLUCIÓN A ERRORES FRECUENTES (TROUBLESHOOTING)
+--------------------------------------------------------
+❌ Error 403: "Google Calendar/Tasks API has not been used in project..."
+* Causas: Tienes el archivo `credentials.json`, pero no has habilitado los permisos de la API en la nube.
+* Solución:
+  1. Entra a https://console.cloud.google.com/
+  2. Selecciona tu proyecto en el menú superior (ID: 283752183126).
+  3. Ve a "APIs & Services" > "Library".
+  4. Busca "Google Calendar API" y dale click en "Enable" (Activar).
+  5. Busca "Google Tasks API" y dale click en "Enable" (Activar).
+  6. Espera 5 minutos a que los servidores de Google propaguen el cambio y vuelve a intentarlo en Telegram.
+
 PLAN DE PRUEBAS PARA LA SEMANA (CHECKLIST DE EVALUACIÓN)
 --------------------------------------------------------
 Para validar que el entorno de DigitalOcean y el código de Jarvis están operando al 100%, realiza las siguientes pruebas a través de Telegram:
