@@ -263,25 +263,23 @@ class Orquestador:
                 resumen_proyectos.append(f"- {nombre}: {p.estado_actual} ({pendientes} tareas pendientes)")
             str_proyectos = "\n            ".join(resumen_proyectos) if resumen_proyectos else "No hay proyectos activos."
 
-            # Historial reciente de conversación
+            # Estado de conversación activo
+            estado_conv_str = conversation_state_manager.get_estado_str()
+            instruccion_modo = conversation_state_manager.get_instruccion_modo()
+
+            # Historial reciente de conversación (se mueve al final del prompt)
             if self._historial_reciente:
                 lineas = []
                 for ex in self._historial_reciente[-10:]:
                     lineas.append(f"  Usuario: {ex['u']}\n  Jarvis: {ex['j']}")
                 historial_str = (
-                    "--- CONVERSACIÓN RECIENTE (MEMORIA INMEDIATA - USAR PRIMERO) ---\n"
+                    "--- CONVERSACIÓN RECIENTE (MÁXIMA PRIORIDAD PARA MANTENER EL HILO) ---\n"
                     + "\n".join(lineas)
                 )
             else:
-                historial_str = ""
-
-            # Estado de conversación activo
-            estado_conv_str = conversation_state_manager.get_estado_str()
-            instruccion_modo = conversation_state_manager.get_instruccion_modo()
+                historial_str = "--- CONVERSACIÓN RECIENTE ---\n(Inicio de nueva conversación)"
 
             return f"""
-            {historial_str}
-
             --- ESTADO DE CONVERSACIÓN ACTIVO ---
             {estado_conv_str}
             {instruccion_modo}
@@ -289,7 +287,7 @@ class Orquestador:
             --- CONTEXTO TEMPORAL Y DE ENTORNO ---
             {hora_local_str}
 
-            --- PERFIL USUARIO ---
+            --- PERFIL USUARIO Y PREFERENCIAS ---
             {persona.model_dump_json(indent=2)}
 
             --- RESUMEN DE PROYECTOS ACTIVOS ---
@@ -302,7 +300,10 @@ class Orquestador:
             --- CONTEXTO Y RECORDATORIOS ---
             {contexto.model_dump_json(indent=2)}
 
+            --- MEMORIA A LARGO PLAZO RELEVANTE ---
             {memoria_vectorial}
+
+            {historial_str}
             """
         except Exception as e:
             logger.warning(f"No se pudo cargar contexto completo: {e}")
