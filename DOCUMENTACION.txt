@@ -1,211 +1,643 @@
-========================================================
-             JARVIS V2 - ASISTENTE PERSONAL (MÓVIL)
-========================================================
+╔══════════════════════════════════════════════════════════════════╗
+║          JARVIS V2 — ASISTENTE PERSONAL INTELIGENTE             ║
+║                  Documentación Técnica Completa                  ║
+║                       Versión 2.5 → 3.0                         ║
+╚══════════════════════════════════════════════════════════════════╝
 
-1. RESUMEN DEL PROYECTO
---------------------------------------------------------
-JARVIS V2 es un Asistente Virtual Conversacional basado en IA (Google Gemini 2.0/1.5) diseñado para interactuar principalmente a través de Telegram (para uso en dispositivos móviles). 
-Su objetivo principal no es solo responder preguntas, sino ser un "compañero estratégico" proactivo: ayuda al usuario a optimizar su tiempo, recuerda detalles de su vida a corto y largo plazo, y envía notificaciones autónomas basadas en una programación (CRON).
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ÍNDICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. Resumen del Proyecto
+  2. Arquitectura y Estructura de Archivos
+  3. Sistema de Memoria Híbrida
+  4. Módulos Nuevos (V3.0)
+  5. Comandos de Telegram
+  6. Variables de Entorno
+  7. Historial de Versiones (Roadmap Cumplido)
+  8. Servidor y Deploy
+  9. Manual de Pruebas Actualizado
+ 10. Limitaciones Actuales
+ 11. Troubleshooting
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Cuenta con un sistema de "Memoria Híbrida":
-- Memoria Estructurada (JSON): Para datos rígidos como el perfil del usuario, proyectos y bitácora diaria.
-- Memoria Rápida (JSON): Para recordatorios y contexto diario (ej. "ir al banco").
-- Memoria Semántica a Largo Plazo (ChromaDB): Para guardar gustos, relaciones e información vital sin saturar el prompt.
 
-2. ESTRUCTURA DE CARPETAS Y ARCHIVOS
---------------------------------------------------------
-[... Estructura Original ...]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1. RESUMEN DEL PROYECTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-3. ANÁLISIS DEL PROYECTO (PROS Y CONTRAS)
---------------------------------------------------------
-[... Contenido Original ...]
+JARVIS V2 es un asistente virtual conversacional impulsado por Google Gemini
+(modelo multimodal) que opera principalmente a través de Telegram.
 
-4. ROADMAP CUMPLIDO (V2.1)
---------------------------------------------------------
-✅ Asincronía Completa (asyncio) liberando Telegram del bloqueo de IO de la IA.
-✅ Sistema de Backup automático ejecutado a las 3:00 AM mediante CRON.
-✅ Búsqueda Web en Tiempo Real integrada (duckduckgo_search) para resolver dudas de eventos muy recientes.
-✅ Soporte para Notas de Voz nativo: Se sube el archivo .ogg directamente a la API Multimodal de Google Gemini.
-✅ Análisis Predictivo de Energía: El orquestador lee los últimos 3 días de la bitácora y se autoinyecta el promedio energético actual del usuario para que Jarvis lo tenga en consideración.
+Su misión va más allá de responder preguntas: es un "segundo cerebro" y
+compañero estratégico que conoce al usuario profundamente, anticipa sus
+necesidades, detecta sus emociones y actúa proactivamente.
 
-ROADMAP CUMPLIDO (V2.2)
---------------------------------------------------------
-✅ Integración con Google Calendar y Google Tasks: Jarvis ahora puede crear eventos en Google Calendar y tareas en Google Tasks.
-✅ Sistema de Sanitización de Entradas: Se ha implementado un sistema de sanitización para evitar ataques de inyección de código.
-✅ Mejoras en el sistema de memoria: Se ha mejorado el sistema de memoria para un mejor rendimiento y una mayor precisión.
+PILARES DEL SISTEMA:
+  • Cerebro IA         → Google Gemini (texto + voz + visión)
+  • Memoria Híbrida    → JSON estructurado + ChromaDB vectorial
+  • Motor Emocional    → Detección de crisis, celebración de logros
+  • Modos de Diálogo   → Escucha profunda, foco, silencio, terapeuta
+  • Voz (TTS)          → gTTS (sin costo, sin API key)
+  • Gráficos           → Matplotlib (energía, proyectos, resumen mensual)
+  • Clima              → OpenWeatherMap (opcional)
+  • Visión             → Gemini Vision API (análisis de fotos)
+  • CRON Inteligente   → 10+ tareas automáticas con triggers contextuales
 
-ROADMAP CUMPLIDO - AUDITORÍA STAFF ENGINEER (V2.5)
---------------------------------------------------------
-✅ Arquitectura SOLID: Inversión de dependencias implementada mediante Interfaces y Repositorios (IData, IVector, ITools) permitiendo pruebas aisladas.
-✅ Resiliencia y Concurrencia: Reescritura del sistema CRON a puramente Asíncrono (sin hilos cruzados), implementando candados `asyncio.Lock` para eliminar Race Conditions.
-✅ Fail-Safe y Graceful Degradation: Si la API de Google Gemini sufre una caída (500) o timeout, Jarvis degradará a comandos locales para no quedar totalmente inutilizado.
-✅ Trazabilidad e ISO 27001: Sustitución de `prints` por un sistema de Logging Rotativo que enmascara automáticamente información sensible (Data Masking) como tarjetas o emails.
-✅ Optimización Big-O y Recursos: Migración de ChromaDB para usar Google Embeddings API, reduciendo drásticamente la carga de RAM de ~80MB a casi O(1).
-✅ Portabilidad y CI/CD: Refactorización a Docker Multi-stage build con Least Privilege (usuario `appuser`), límites de hardware en Docker Compose (evitando OOM Killer) y pipeline CI en Github Actions validado por +39 pruebas unitarias.
 
-5. FUTURO: OPORTUNIDADES DE MEJORA (V3)
---------------------------------------------------------
-✅ Reconocimiento OCR y de Imágenes enviando fotos por Telegram.
-✅ Respuesta en Notas de Voz (Sintetizador ElevenLabs / OpenAI TTS).
-✅ Integración con IFTTT para automatizaciones complejas.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 2. ARQUITECTURA Y ESTRUCTURA DE ARCHIVOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-========================================================
-         INFORME DE DESPLIEGUE EN DIGITALOCEAN
-========================================================
+JARVIS_V2/
+│
+├── main.py                      ← Punto de entrada principal
+├── Dockerfile                   ← Build multi-stage (builder + runner)
+├── docker-compose.yml           ← Orquestación del contenedor
+├── requirements.txt             ← Dependencias Python
+│
+├── src/
+│   ├── core/                    ← Lógica central del sistema
+│   │   ├── cerebro.py           ← LLM (Gemini) + parser de intenciones
+│   │   ├── orquestador.py       ← Pipeline principal (controller)
+│   │   ├── cron.py              ← Scheduler autónomo de tareas
+│   │   ├── memory_manager.py    ← CRUD de toda la memoria
+│   │   ├── repositories.py      ← Implementaciones concretas (DI)
+│   │   ├── interfaces.py        ← Contratos/Interfaces (SOLID)
+│   │   ├── conversation_state.py← [NUEVO] Modos de conversación
+│   │   ├── emotion_engine.py    ← [NUEVO] Motor emocional
+│   │   └── prompts.py           ← Templates de prompts auxiliares
+│   │
+│   ├── data/                    ← Acceso a datos
+│   │   ├── db_handler.py        ← Lectura/escritura JSON (atómica)
+│   │   ├── schemas.py           ← Modelos Pydantic de datos
+│   │   └── vector_db.py         ← ChromaDB + Google Embeddings
+│   │
+│   ├── TOOLS/                   ← Herramientas ejecutables por la IA
+│   │   ├── tool_system.py       ← Sistema, hora, búsqueda web, modos
+│   │   ├── tool_memory.py       ← Operaciones de memoria avanzadas
+│   │   ├── tool_agenda.py       ← Google Calendar + Tasks
+│   │   ├── tool_tts.py          ← [NUEVO] Síntesis de voz (gTTS)
+│   │   ├── tool_weather.py      ← [NUEVO] Clima (OpenWeatherMap)
+│   │   └── tool_graphs.py       ← [NUEVO] Gráficos (Matplotlib)
+│   │
+│   ├── INTERFACES/
+│   │   └── telegram_bot.py      ← Bot Telegram (handlers + comandos)
+│   │
+│   └── utils/
+│       ├── logger_config.py     ← Logging rotativo con data masking
+│       ├── sanitizador.py       ← Protección contra inyección
+│       ├── backup.py            ← Sistema de backup automático
+│       ├── model_loader.py      ← Selección dinámica del modelo Gemini
+│       └── time_utils.py        ← Utilidades de tiempo/timezone
+│
+├── MEMORIA/                     ← Datos persistentes (montados en Docker)
+│   ├── persona.json             ← Perfil del usuario (nombre, edad, etc.)
+│   ├── entorno.json             ← Contexto físico (ciudad, timezone)
+│   ├── proyectos.json           ← Proyectos activos con tareas
+│   ├── contexto.json            ← Recordatorios y rutinas
+│   ├── bitacora.json            ← Historial diario (energía, estado)
+│   ├── estado_emocional.json    ← [NUEVO] Seguimiento emocional
+│   └── vector_db/               ← Base vectorial ChromaDB (embeddings)
+│
+├── LOGS/                        ← Registros rotativos del sistema
+├── tests/                       ← Suite de pruebas (47 tests)
+└── DEPLOY_ORACLE/               ← Scripts de despliegue en Oracle Cloud
 
-REPORTE DE RECURSOS ACTUALES (DIGITALOCEAN DROPLET)
---------------------------------------------------------
-- CPU: 1 vCPU (2.0 GHz)
-- RAM Física Total: 1 GB (961 MiB)
-- RAM Disponible Actual: ~418 MiB (con Jarvis y Nginx corriendo)
-- Almacenamiento: 24 GB totales (14 GB disponibles)
-- Memoria Virtual (Swap): 4 GB (Configurada para protección OOM)
 
-ESTADO DE LOS CONTENEDORES ACTIVOS
---------------------------------------------------------
-1. Nginx Proxy Manager: Consume ~100-150 MiB de RAM.
-2. JARVIS_V2 (Bot Telegram): Consume recursos moderados. Su límite en `docker-compose.yml` está configurado a 512 MiB.
-   
-ANÁLISIS DE FACTIBILIDAD: DESPLIEGUE DE BUHO SAAS (MOTOR AUDIO JSON)
---------------------------------------------------------
-Tras analizar a fondo el código fuente y la arquitectura de la Fase B de "SMART MILL / FACTORY CORE (SAAS)" en la carpeta `MOTOR AUDIO JSON`, este es el desglose del consumo real esperado en producción (sin contar límites artificiales, solo lo que la tecnología exige físicamente):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 3. SISTEMA DE MEMORIA HÍBRIDA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. Base de Datos (PostgreSQL + TimescaleDB + pgvector): Las bases de datos relacionales con extensiones vectoriales y partición IoT son pesadas. Requiere un mínimo absoluto de ~500 MB en reposo/operaciones básicas (Recomendado 1GB+).
-2. Backend (FastAPI + Uvicorn + SQLAlchemy): Un worker básico consumirá ~150 MB.
-3. Frontend (React SPA servido estáticamente por Nginx): Consumo ínfimo, ~20 MB.
-4. Nginx Proxy Manager (Ya corriendo): ~150 MB.
-5. JARVIS_V2 (Ya corriendo): ~150 MB.
-6. Sistema Operativo Base (Ubuntu): ~200 MB.
+JARVIS usa tres capas de memoria con diferentes características:
 
-📊 CÁLCULO DE MEMORIA RAM TOTAL:
-- Consumo Base Estimado: 500 + 150 + 20 + 150 + 150 + 200 = 1,170 MB (1.17 GB).
-- Margen de Seguridad del 30% (Para evitar cuelgues por picos de tráfico/consultas): 1170 * 1.30 = 1,521 MB (1.52 GB).
-- RAM Física de tu Droplet Actual: 961 MB.
-👉 Déficit de RAM: Te faltan físicamente unos ~560 MB solo para que el sistema "respire" y no colapse. 
+┌─────────────────────────────────────────────────────────────────┐
+│ CAPA 1: MEMORIA EN SESIÓN (RAM)                                 │
+│  • Historial reciente de la conversación actual (últimos 12)    │
+│  • Estado de modos de conversación activos                      │
+│  • Acceso: O(1) — inmediato                                     │
+│  • Durabilidad: Se pierde al reiniciar (intencional)            │
+└─────────────────────────────────────────────────────────────────┘
 
-📊 CÁLCULO DE CPU:
-- TimescaleDB (IoT) y búsquedas pgvector son intensivas. 
-- FastApi y el ruteo de Nginx requieren procesamiento en tiempo real.
-- Tu Droplet actual tiene 1 vCPU compartida. Al haber tareas concurrentes (Jarvis escuchando en Telegram + Buho insertando telemetría), la CPU llegará al 100% de uso.
+┌─────────────────────────────────────────────────────────────────┐
+│ CAPA 2: MEMORIA ESTRUCTURADA (JSON en disco)                    │
+│  • persona.json     → Nombre, edad, profesión, preferencias     │
+│  • entorno.json     → Ubicación, timezone, personas clave       │
+│  • proyectos.json   → Proyectos activos con tareas y estado     │
+│  • contexto.json    → Recordatorios pendientes, rutinas         │
+│  • bitacora.json    → Registro diario de energía y estado ánimo │
+│  • estado_emocional.json → [NUEVO] Crisis, logros, follow-ups   │
+│  • Acceso: Asíncrono con escritura atómica (tmp + fsync)        │
+└─────────────────────────────────────────────────────────────────┘
 
-❌ LIMITANTES CRÍTICAS EN EL SERVIDOR ACTUAL:
-1. OOM Killer (Out of Memory): Al superar el 100% de la RAM física, el sistema operativo empezará a matar contenedores aleatoriamente (podría matar a Jarvis o a la base de datos perdiendo datos).
-2. Thrashing Extremo: Al usar los 4GB de Swap que configuré para compensar la falta de RAM, el disco duro SSD actuará como memoria. Esto vuelve todo el servidor entre 10x y 100x más lento, provocando "Timeouts" (caídas) en las peticiones de tu frontend.
-3. Cuello de Botella CPU: 1 núcleo no es suficiente para la arquitectura "Smart Mill" + Jarvis.
+┌─────────────────────────────────────────────────────────────────┐
+│ CAPA 3: MEMORIA SEMÁNTICA (ChromaDB vectorial)                  │
+│  • Hechos de vida importantes (cumpleaños, alergias, logros)    │
+│  • Embedding: Google Generative AI Embeddings                   │
+│  • Búsqueda: Por similitud semántica (cosine similarity)        │
+│  • Auto-migración si hay conflicto de embedding function        │
+└─────────────────────────────────────────────────────────────────┘
 
-CONCLUSIÓN Y RECOMENDACIÓN EXACTA
---------------------------------------------------------
-No es viable desplegar el ecosistema "Buho SaaS" en el servidor actual (1GB RAM / 1 vCPU). Fallará irremediablemente al procesar las peticiones IoT o al usar la IA.
+INTENCIONES DE MEMORIA (Lo que la IA detecta automáticamente):
+  actualizar_nombre          → "Me llamo Joseph"
+  actualizar_edad            → "Tengo 30 años"
+  actualizar_profesion       → "Soy ingeniero"
+  actualizar_preferencia     → "Me gusta el azul / los gatos / etc."
+  actualizar_rutina          → "Hago ejercicio a las 7am"
+  actualizar_persona_clave   → "Mi esposa se llama María"
+  actualizar_estado_animo    → "Hoy me siento cansado / energía 8"
+  nuevo_recordatorio         → "Recuérdame comprar leche"
+  nuevo_recuerdo_largo_plazo → "Mi hijo nació el 16 de febrero"
+  guardar_conversacion_profunda → [NUEVO] Tema con seguimiento automático
+  registrar_logro            → [NUEVO] Logro importante del usuario
 
-Recomendación Directa (Escalamiento Vertical):
-Entra al panel de DigitalOcean y haz un "Resize" (Redimensionamiento) del Droplet actual a un plan de:
-👉 Mínimo: 2 vCPUs y 2 GB de RAM.
-👉 Ideal (Recomendado): 2 vCPUs y 4 GB de RAM (Para garantizar fluidez en las búsquedas vectoriales y el procesamiento de audio/telemetría futura).
 
-========================================================
-         MANUAL DE USUARIO Y PLAN DE PRUEBAS
-========================================================
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 4. MÓDULOS NUEVOS (V3.0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CAPACIDADES ACTUALES DE JARVIS V2 (LO QUE SÍ PUEDE HACER)
---------------------------------------------------------
-1. Conversación Natural y Empática: Entiende el contexto de mensajes anteriores y mantiene el hilo de la conversación.
-2. Memoria a Corto Plazo (Recordatorios Rápidos): Puede agendar tareas o compras a corto plazo (ej. "Añade comprar leche a la lista").
-3. Memoria Semántica a Largo Plazo: Si le compartes un gusto, fecha importante, o relación familiar, Jarvis decide autónomamente si vale la pena guardarlo en su base vectorial profunda para recordarlo semanas después.
-4. Procesamiento de Audios/Notas de Voz: Puedes enviarle notas de voz largas directamente desde Telegram. Escuchará y analizará el contenido como si lo hubieses escrito.
-5. Recordatorios y Alarmas Programadas: Puedes decirle "Avísame a las 15:30 que saque la ropa" y él usará una herramienta de agenda para enviarte un mensaje exacto a esa hora de hoy.
-6. Consultas de Estado del Sistema: Puedes preguntarle "¿Qué hora es?" o "¿Cómo está el sistema?" para obtener reportes de la hora actual y métricas del servidor.
-7. Búsqueda Web en Tiempo Real: Puedes preguntarle sobre noticias actuales (ej. "Busca quién ganó el partido de hoy") y Jarvis usará su motor DuckDuckGo.
-8. Proactividad CRON: Enviará mensajes automáticamente (siempre y cuando se configure un horario en `cron.py`) para revisar tu nivel de energía y preguntarte por tu día, usando un análisis predictivo basado en los últimos 3 días.
-9. Creación de Eventos y Tareas: Puedes pedirle a Jarvis que cree un evento en tu Google Calendar o una tarea en tu Google Tasks.
+─────────────────────────────────────────────────────────────────
+ 4.1 MOTOR EMOCIONAL (emotion_engine.py)
+─────────────────────────────────────────────────────────────────
+Analiza cada mensaje del usuario en tiempo real buscando patrones.
 
-LIMITACIONES ACTUALES (LO QUE NO PUEDE HACER)
---------------------------------------------------------
-1. Tareas Multi-paso sin Supervisión: No puede ejecutar secuencias autónomas de operaciones largas que no estén codificadas como una herramienta atómica.
-2. Procesamiento de Imágenes/Video: Aunque soporta notas de voz (.ogg), actualmente no procesa fotos o documentos PDF que envíes por Telegram.
-3. Llamadas de Voz Bidireccionales (Llamada telefónica): Lee audios, pero te responderá en texto.
-4. Alarmas Nativas del Celular: Como Jarvis vive en un servidor y se comunica por Telegram, no tiene acceso al sistema operativo de tu teléfono para configurar alarmas nativas. Solo puede enviarte recordatorios como un mensaje de chat a una hora determinada.
+DETECCIÓN DE CRISIS (2 niveles):
+  Nivel 1 → Palabras de tristeza/soledad ("solo", "triste", "mal")
+             → JARVIS responde con empatía profunda
+             → Si persiste 3+ días: envía alerta proactiva
+  Nivel 2 → Palabras de desesperanza ("no puedo más", "no vale la pena")
+             → Respuesta inmediata de seguridad + recursos de apoyo
 
-¿QUÉ MÁS SE LE PODRÍA AÑADIR (ROADMAP RÁPIDO)?
---------------------------------------------------------
-- Reconocimiento OCR y de Imágenes enviando fotos por Telegram.
-- Respuesta en Notas de Voz (Sintetizador ElevenLabs / OpenAI TTS).
-- Integración con IFTTT para automatizaciones complejas.
+CELEBRACIÓN DE LOGROS:
+  → Detecta cuando el usuario completa algo importante
+  → Genera mensaje de celebración personalizado
+  → Registra el logro en estado_emocional.json
+  → Guarda en memoria vectorial para referencia futura
 
-FILOSOFÍA DE PRUEBAS: ¿POR QUÉ LOS PYTEST USAN "MOCKS" Y NO DATOS REALES?
---------------------------------------------------------
-Durante la auditoría, usamos **"Mocks"** (simulaciones) para las pruebas automatizadas. Por eso, aunque los 39 tests pasaban, al probarlo en el mundo real aparecieron errores con las APIs de Google. Esto es **normal y es el diseño correcto de pruebas**. La razón es la siguiente:
+FOLLOW-UP AUTOMÁTICO:
+  → Cuando la IA detecta un tema importante (salud, relación, meta),
+    guarda una "conversación profunda" con fecha de seguimiento
+  → El CRON verifica diariamente si hay follow-ups pendientes
+  → Ejemplo: "La última vez hablamos de tu preocupación por X.
+              ¿Fuiste al médico como planeabas?"
 
-1.  **Pruebas Unitarias/Integración (Las que hicimos con Pytest y Mocks):**
-    *   **Objetivo:** Probar NUESTRO código, no el de Google. La pregunta es: "Si Google respondiera 'X', ¿mi código haría 'Y'?".
-    *   **Ventajas:** Son extremadamente rápidas (segundos), no dependen de una conexión a internet, no gastan tu cuota de API, y no fallan si el servidor de Google se cae. Aislan el problema a nuestro código.
+TRIGGERS DE METAS OLVIDADAS:
+  → Registra la fecha de última mención de cada meta
+  → Si pasan 5+ días sin mencionar una meta activa:
+    → Mensaje espontáneo: "Hace días no mencionas tu meta de [X].
+                           ¿Perdiste el interés o solo falta tiempo?"
 
-2.  **Pruebas End-to-End o Manuales (Las que tú estás haciendo ahora en Telegram):**
-    *   **Objetivo:** Probar el sistema completo en un entorno REAL, incluyendo la conexión con Google, la base de datos, etc.
-    *   **Ventajas:** Encuentran problemas del "mundo real" que los Mocks no pueden ver, como credenciales vencidas, APIs desactivadas (el error 403), o cambios inesperados en la API de un proveedor (el error del `mime_type`).
+─────────────────────────────────────────────────────────────────
+ 4.2 MODOS DE CONVERSACIÓN (conversation_state.py)
+─────────────────────────────────────────────────────────────────
+Gestiona el estado activo de la conversación. Se activa por comandos
+de Telegram o cuando la IA detecta la necesidad.
 
-En resumen: Ambas pruebas son cruciales y no se reemplazan. Los Mocks nos permitieron asegurar que la lógica interna de Jarvis es sólida. Ahora, tus pruebas manuales nos ayudan a afinar la conexión con el mundo exterior.
+MODO NORMAL (default):
+  → Comportamiento estándar
 
-SOLUCIÓN A ERRORES FRECUENTES (TROUBLESHOOTING)
---------------------------------------------------------
-❌ Error 403: "Google Calendar/Tasks API has not been used in project..."
-* Causas: Tienes el archivo `credentials.json`, pero no has habilitado los permisos de la API en la nube.
-* Solución:
-  1. Entra a https://console.cloud.google.com/
-  2. Selecciona tu proyecto en el menú superior (ID: 283752183126).
-  3. Ve a "APIs & Services" > "Library".
-  4. Busca "Google Calendar API" y dale click en "Enable" (Activar).
-  5. Busca "Google Tasks API" y dale click en "Enable" (Activar).
-  6. Espera 5 minutos a que los servidores de Google propaguen el cambio y vuelve a intentarlo en Telegram.
+MODO ESCUCHA PROFUNDA (/escucha):
+  → Alta empatía, mantiene el hilo emocional
+  → No cambia de tema ni ofrece soluciones no pedidas
+  → Dura 5 intercambios, luego vuelve a Normal automáticamente
+  → La IA puede activarlo si detecta que el usuario necesita ser escuchado
 
-PLAN DE PRUEBAS PARA LA SEMANA (CHECKLIST DE EVALUACIÓN)
---------------------------------------------------------
-Para validar que el entorno de DigitalOcean y el código de Jarvis están operando al 100%, realiza las siguientes pruebas a través de Telegram:
+MODO TRABAJO PROFUNDO (/foco [minutos]):
+  → JARVIS no envía notificaciones proactivas (CRON silenciado)
+  → Respuestas muy breves (1 frase)
+  → Al terminar el tiempo: "¿Qué lograste en esta sesión?"
 
-✅ PRUEBA 1: Comunicación Básica y Zero-Trust
-- [ ] Envíale un simple "Hola". (Debe responder con naturalidad).
-- [ ] Pide a un amigo que envíe un mensaje a tu Bot desde su cuenta. (El bot no debe responderle o debe rechazarlo, confirmando el blindaje del ID).
+MODO SILENCIOSO (/silencio [minutos]):
+  → JARVIS sigue respondiendo si se le escribe
+  → Pero NO envía mensajes del CRON (check-ins, recordatorios)
+  → Ideal para horas de trabajo o descanso
 
-✅ PRUEBA 2: Consulta del Sistema
-- [ ] Pregúntale: "Dime la hora exacta de tu sistema". (Validará que la zona horaria de DigitalOcean esté en UTC o tu zona local y que la herramienta interna funcione).
+MODO TERAPEUTA (/terapeuta):
+  → Sesión estructurada de 5 preguntas (basada en CBT + Journaling)
+  → Preguntas: Victoria semanal, Desafío y aprendizaje, Bienestar físico,
+               Tarea evitada, Calificación global de la semana
+  → También se activa automáticamente cada domingo a las 20:00
 
-✅ PRUEBA 3: Memoria a Corto Plazo (Contexto Diario)
-- [ ] Dile: "Voy a ir al súper más tarde, recuérdame comprar leche".
-- [ ] Tras unos mensajes, pregúntale: "¿Qué tenía que comprar?". (Debe revisar su contexto JSON y decírtelo).
+─────────────────────────────────────────────────────────────────
+ 4.3 TEXT-TO-SPEECH — RESPUESTAS EN VOZ (tool_tts.py)
+─────────────────────────────────────────────────────────────────
+Convierte las respuestas de texto en notas de voz de Telegram.
 
-✅ PRUEBA 4: Recordatorios Temporizados
-- [ ] Dile: "Avísame a las [Pon una hora 3 minutos en el futuro] que tengo una reunión".
-- [ ] Cierra Telegram y espera. A la hora exacta, el bot debe enviarte un mensaje proactivo.
+  • Tecnología: gTTS (Google Text-to-Speech)
+  • Costo: GRATUITO (sin API key necesaria)
+  • Formato: MP3 → enviado como nota de voz en Telegram
+  • Idioma: Español por defecto (configurable en .env)
+  • Activación: Comando /tts (toggle on/off)
 
-✅ PRUEBA 5: Búsqueda Web
-- [ ] Pregúntale algo muy reciente: "¿Cuál es el precio de Bitcoin hoy?" o "¿Qué pasó hoy en las noticias importantes?". (Debe usar DuckDuckGo y devolver información real, no alucinada).
+CONFIGURACIÓN EN .env (opcional):
+  TTS_IDIOMA="es"       → es, en, pt, fr, de...
+  TTS_LENTA="false"     → "true" para voz más lenta
 
-✅ PRUEBA 6: Procesamiento de Notas de Voz Multimodal
-- [ ] Envíale una nota de voz de 10-15 segundos explicándole qué harás hoy y pregúntale qué opina. (Debe descargar el audio en el servidor, subirlo a Gemini y responder con coherencia).
+─────────────────────────────────────────────────────────────────
+ 4.4 CLIMA EN TIEMPO REAL (tool_weather.py)
+─────────────────────────────────────────────────────────────────
+Obtiene el clima actual y pronóstico usando OpenWeatherMap.
 
-✅ PRUEBA 7: Memoria a Largo Plazo Vectorial
-- [ ] Dile: "Como dato importante sobre mí: soy alérgico a los mariscos y mi hermano se llama Carlos."
-- [ ] Escribe varios mensajes irrelevantes para alejar la charla de ese tema ("qué buen clima", "cuéntame un chiste").
-- [ ] Pregúntale: "¿Recuerdas si soy alérgico a algo?" o "¿Cómo se llama mi hermano?". (Debe poder buscarlo en su base ChromaDB).
+  • API: OpenWeatherMap (plan gratuito: 1000 llamadas/día)
+  • Requiere: OPENWEATHER_API_KEY en el .env
+  • Ciudad por defecto: OPENWEATHER_CIUDAD en el .env (ej: "Lima")
+  • Si no está configurado: el sistema funciona normal sin esta función
 
-✅ PRUEBA 8: Creación de Eventos y Tareas
-- [ ] Pídele a Jarvis que cree un evento en tu Google Calendar para mañana a las 10 AM con el título "Reunión de equipo".
-- [ ] Pídele a Jarvis que cree una tarea en tu Google Tasks con el título "Comprar leche".
+USO DESDE TELEGRAM:
+  → Comando /clima [ciudad]     → Clima de cualquier ciudad
+  → "¿Cómo está el clima hoy?" → JARVIS detecta y usa la herramienta
 
-✅ PRUEBA 9: Sanitización de Entradas (Anti-Hackeo)
-- [ ] Envíale a Jarvis el siguiente texto exactamente: `eval('import os; os.system("rm -rf /")')`.
-- [ ] Jarvis no debe bloquearse ni colapsar, simplemente debe responder que ha bloqueado el input por seguridad o ignorar el comando malicioso.
+INTEGRACIÓN CON CRON:
+  → El check-in matutino (08:00) incluye el clima si está configurado
+  → Sugerencias contextuales: "Hoy llueve. ¿Quieres reprogramar tu
+    rutina de ejercicio al gimnasio?"
 
-✅ PRUEBA 10: Graceful Degradation (Fallback Local)
-- [ ] Entra a tu `.env` en el servidor y rompe a propósito la API KEY (ej. cámbiala a `GEMINI_API_KEY="falsa"`).
-- [ ] Reinicia el contenedor (`docker compose restart`).
-- [ ] Pregúntale a Jarvis en Telegram: "¿Qué hora es?". 
-- [ ] Aunque la IA de Google esté caída, Jarvis deberá responderte con la hora local de tu sistema (Comprobando el Fail-Safe que programamos).
-- [ ] Vuelve a poner la API Key correcta cuando termines.
+─────────────────────────────────────────────────────────────────
+ 4.5 GRÁFICOS VISUALES (tool_graphs.py)
+─────────────────────────────────────────────────────────────────
+Genera imágenes con datos del usuario y las envía por Telegram.
 
-CRITERIOS DE ÉXITO (EVALUACIÓN)
---------------------------------------------------------
-El sistema se considerará "Productivo y Estable" si:
-1. No se experimentan "Timeouts" (ausencia de respuesta por más de 15 segundos) en las interacciones diarias.
-2. El bot logra usar las 4 herramientas principales sin crashear el contenedor Docker (Memoria, Web, Sistema y Agenda).
-3. Los recordatorios CRON no detienen el flujo de la conversación normal.
-4. El contenedor en DigitalOcean se mantiene corriendo durante la semana sin entrar en estado "Killed" (OOM) o reiniciarse sorpresivamente.
+  • Tecnología: Matplotlib (sin pantalla, backend Agg)
+  • Formato de salida: PNG (enviado como foto en Telegram)
+
+TIPOS DE GRÁFICOS:
+  1. Gráfico de Energía (/progreso)
+     → Línea de nivel de energía de los últimos N días
+     → Colores: verde (7-10), amarillo (4-6), rojo (1-3)
+
+  2. Progreso de Proyecto
+     → Barras de tareas completadas vs. pendientes por proyecto
+     → Disponible cuando la IA detecta que pides el progreso de un proyecto
+
+  3. Resumen Mensual (/mes)
+     → Scatter plot con energía y estado de ánimo del mes actual
+
+USO DESDE TELEGRAM:
+  → Comando /progreso         → Gráfico de energía (7 días)
+  → Comando /mes              → Resumen visual del mes
+  → "Muéstrame mi progreso"   → La IA genera el gráfico correspondiente
+
+─────────────────────────────────────────────────────────────────
+ 4.6 VISIÓN ARTIFICIAL — ANÁLISIS DE IMÁGENES (cerebro.py)
+─────────────────────────────────────────────────────────────────
+JARVIS puede analizar fotos enviadas por Telegram usando Gemini Vision.
+
+CASOS DE USO:
+  • Foto de pizarra/notas     → Extrae tareas y las agenda
+  • Foto de documento/factura → Extrae información relevante
+  • Foto en el gym/corriendo  → Detecta el logro y lo celebra
+  • Foto con texto            → Transcribe y actúa en consecuencia
+  • Imagen enviada como archivo → También procesada (MIME detection)
+
+CÓMO USARLO:
+  → Simplemente envía una foto por Telegram (con o sin caption)
+  → JARVIS la descarga, la envía inline a Gemini Vision y responde
+  → No requiere comandos especiales
+
+─────────────────────────────────────────────────────────────────
+ 4.7 CRON INTELIGENTE V2 (cron.py)
+─────────────────────────────────────────────────────────────────
+El scheduler autónomo ahora tiene 10+ tareas con lógica contextual.
+
+TAREAS DIARIAS:
+  08:00 → Check-in matutino (saludo + rutinas + clima + recordatorios)
+  09:00 → Verificar follow-ups de conversaciones profundas pendientes
+  11:00 → Detectar si hay patrón emocional negativo acumulado (3+ días)
+  14:00 → Check-in de mediodía (progreso del día + recordatorios tarde)
+  20:30 → Check-in nocturno (cierre del día + reflexión de bienestar)
+  22:00 → Resumen diario (pendientes, energía, motivación)
+  03:00 → Backup automático de toda la memoria
+
+TAREAS SEMANALES:
+  Lun 08:30 → Análisis de patrones de energía de la semana pasada
+  Mar 10:00 → Trigger de metas: ¿hay metas sin mencionar por 5+ días?
+  Mié 10:00 → Sugerencia no solicitada (búsqueda web basada en intereses)
+  Jue 10:00 → Trigger de metas (segunda verificación semanal)
+  Dom 10:00 → Seguimiento de metas a largo plazo
+  Dom 18:00 → Validación de rutinas ("¿sigues yendo al gym?")
+  Dom 20:00 → Sesión terapeuta guiada (5 preguntas de reflexión)
+
+RESPETO DE MODOS:
+  → Si el modo es SILENCIOSO o TRABAJO PROFUNDO, el CRON no envía
+    mensajes proactivos hasta que el modo se desactive
+
+ALARMAS DINÁMICAS:
+  → "Avísame a las 15:30 que tengo reunión" → CRON agenda esa alarma
+  → Se resetean automáticamente cada día a las 03:00 (con el backup)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 5. COMANDOS DE TELEGRAM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─── VOZ Y MODOS ──────────────────────────────────────────────────
+  /tts              → Activar/desactivar respuestas en voz (toggle)
+  /escucha [tema]   → Modo escucha profunda (empatía, 5 intercambios)
+  /foco [minutos]   → Modo trabajo profundo (default: 90 min)
+  /silencio [min]   → Modo silencioso (sin notificaciones proactivas)
+  /terapeuta        → Iniciar sesión de reflexión guiada (5 preguntas)
+  /normal           → Desactivar cualquier modo activo, volver a Normal
+
+─── DATOS Y PROGRESO ─────────────────────────────────────────────
+  /progreso         → Gráfico PNG de energía (últimos 7 días)
+  /mes              → Resumen visual del mes actual
+  /clima [ciudad]   → Clima actual y sugerencia contextual
+
+─── SISTEMA ──────────────────────────────────────────────────────
+  /estado           → Ver modo activo actual + estado del TTS
+  /start            → Mensaje de bienvenida
+  /ayuda            → Lista completa de comandos
+
+─── MENSAJES ESPECIALES (sin comando) ────────────────────────────
+  Texto largo       → Conversación normal con JARVIS
+  Nota de voz .ogg  → JARVIS la transcribe con Gemini Audio
+  Foto              → JARVIS la analiza con Gemini Vision
+  Imagen como archivo → También analizada (detecta MIME type)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 6. VARIABLES DE ENTORNO (.env)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+OBLIGATORIAS:
+  TELEGRAM_TOKEN="..."        → Token del bot de Telegram (BotFather)
+  GEMINI_API_KEY="..."        → Clave de Google Generative AI
+  TELEGRAM_USER_ID="..."      → Tu ID numérico de Telegram (seguridad)
+
+OPCIONALES — CLIMA:
+  OPENWEATHER_API_KEY="..."   → Clave de OpenWeatherMap (plan gratuito)
+  OPENWEATHER_CIUDAD="Lima"   → Ciudad por defecto para el clima
+
+OPCIONALES — VOZ (TTS):
+  TTS_IDIOMA="es"             → Código de idioma (es, en, pt, fr...)
+  TTS_LENTA="false"           → "true" para velocidad más lenta
+
+OPCIONALES — GOOGLE AGENDA:
+  GOOGLE_CALENDAR_ID="primary"
+  GOOGLE_CREDENTIALS_PATH="credentials.json"
+
+DÓNDE CONFIGURARLAS EN PRODUCCIÓN:
+  → Archivo /app/jarvis_v2/.env en el servidor
+  → NUNCA commitear el .env al repositorio (está en .gitignore)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 7. HISTORIAL DE VERSIONES (ROADMAP CUMPLIDO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+V2.1 — Base del Sistema
+  ✅ Asincronía completa con asyncio
+  ✅ CRON con backup automático a las 03:00
+  ✅ Búsqueda web en tiempo real (DuckDuckGo)
+  ✅ Notas de voz → Gemini Audio API
+  ✅ Análisis predictivo de energía (bitácora 3 días)
+
+V2.2 — Integraciones Externas
+  ✅ Google Calendar y Google Tasks
+  ✅ Sanitización de entradas (anti-inyección)
+  ✅ Mejoras en sistema de memoria
+
+V2.5 — Arquitectura SOLID (Auditoría Staff Engineer)
+  ✅ Inversión de dependencias (Interfaces + Repositorios)
+  ✅ CRON puramente asíncrono + asyncio.Lock (sin race conditions)
+  ✅ Fail-Safe + Graceful Degradation (si Gemini cae)
+  ✅ Logging rotativo con Data Masking (ISO 27001)
+  ✅ Google Embeddings API en ChromaDB (RAM: ~80MB → O(1))
+  ✅ Docker Multi-stage build con Least Privilege (appuser)
+  ✅ 39+ tests automatizados (unitarios + integración + E2E)
+
+V3.0 — Personalidad, Emociones e Iniciativa Propia
+  ✅ Motor Emocional (detección de crisis nivel 1 y 2)
+  ✅ Celebración activa de logros con registro
+  ✅ Modos de conversación: Escucha, Foco, Silencio, Terapeuta
+  ✅ Text-to-Speech con gTTS (voz gratuita, sin API key)
+  ✅ Visión Artificial: análisis de fotos con Gemini Vision
+  ✅ Gráficos visuales con Matplotlib (energía, proyectos, mensual)
+  ✅ Integración con clima (OpenWeatherMap, plan gratuito)
+  ✅ Memoria de conversaciones profundas con follow-up automático
+  ✅ Triggers inteligentes de metas olvidadas
+  ✅ Sesión terapeuta semanal automática (domingos 20:00)
+  ✅ Sugerencias no solicitadas semanales (búsqueda web + perfil)
+  ✅ CRON inteligente con 10 tareas (respeta modos silenciosos)
+  ✅ Auto-migración de ChromaDB (conflicto de embedding function)
+  ✅ 11 nuevos comandos en Telegram
+  ✅ 47/47 tests pasando
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 8. SERVIDOR Y DEPLOY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SERVIDOR ACTUAL:
+  IP:          192.241.131.142 (DigitalOcean/Oracle)
+  Directorio:  /app/jarvis_v2/
+  Contenedor:  jarvis_v2_bot
+  Límite RAM:  1 GB (ajustado para TTS + Matplotlib + ChromaDB)
+  Límite CPU:  1 core
+  Swap:        4 GB (protección anti-OOM)
+
+DEPLOY RÁPIDO (actualizar servidor):
+  ssh root@192.241.131.142 "cd /app/jarvis_v2 && git pull && docker compose build && docker compose up -d"
+
+COMANDOS DE ADMINISTRACIÓN EN SERVIDOR:
+  Ver logs en tiempo real:     docker logs jarvis_v2_bot -f
+  Ver últimas 50 líneas:       docker logs jarvis_v2_bot --tail 50
+  Reiniciar contenedor:        docker restart jarvis_v2_bot
+  Estado del contenedor:       docker ps --filter name=jarvis_v2_bot
+  Usar más memoria (si falla): docker stats jarvis_v2_bot
+
+PERMISOS DE VOLÚMENES (si el contenedor no arranca):
+  ssh root@192.241.131.142 "chmod -R 777 /app/jarvis_v2/LOGS /app/jarvis_v2/MEMORIA"
+
+EDITAR .env EN PRODUCCIÓN:
+  ssh root@192.241.131.142 "nano /app/jarvis_v2/.env"
+  → Luego reiniciar: docker restart jarvis_v2_bot
+
+ANÁLISIS DE ESCALABILIDAD:
+  La V3.0 con TTS + Matplotlib + ChromaDB requiere ~600-800 MB de RAM en pico.
+  El límite actual de 1 GB es suficiente para uso personal.
+  Si se añaden más usuarios o módulos pesados, considerar upgrade a 2 GB.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 9. MANUAL DE PRUEBAS ACTUALIZADO (V3.0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PRUEBAS FUNDAMENTALES (de versiones anteriores):
+─────────────────────────────────────────────────
+  [ ] PRUEBA 1 — Seguridad Zero-Trust
+      → Envía "Hola" desde tu cuenta. Debe responder.
+      → Pide a un amigo que escriba al bot. Debe rechazarlo.
+
+  [ ] PRUEBA 2 — Herramienta de hora y timezone
+      → Pregunta: "¿Qué hora es exactamente?"
+      → Debe responder con la hora de tu zona configurada en entorno.json
+
+  [ ] PRUEBA 3 — Memoria a corto plazo
+      → Dile: "Recuérdame comprar leche más tarde"
+      → Después: "¿Qué tenía pendiente para comprar?"
+      → Debe recordarlo desde contexto.json
+
+  [ ] PRUEBA 4 — Alarma programada
+      → Dile: "Avísame a las [hora+3min] que tengo una reunión"
+      → Espera. El bot debe escribirte a esa hora exacta.
+
+  [ ] PRUEBA 5 — Búsqueda web
+      → Pregunta: "¿Cuál es el precio del Bitcoin hoy?"
+      → Debe buscar en DuckDuckGo y responder con datos reales.
+
+  [ ] PRUEBA 6 — Nota de voz (Gemini Audio)
+      → Envía una nota de voz de 15 segundos
+      → Debe transcribir y responder al contenido del audio.
+
+  [ ] PRUEBA 7 — Memoria a largo plazo (ChromaDB)
+      → Dile: "Soy alérgico a los mariscos y mi hermano se llama Carlos"
+      → Escribe 5 mensajes irrelevantes
+      → Pregunta: "¿Soy alérgico a algo?" o "¿Cómo se llama mi hermano?"
+      → Debe recuperarlo desde ChromaDB
+
+PRUEBAS NUEVAS V3.0:
+─────────────────────────────────────────────────
+  [ ] PRUEBA 8 — Modo Escucha Profunda
+      → Escribe: /escucha
+      → Dile algo difícil ("hoy me fue muy mal en el trabajo")
+      → JARVIS debe responder con alta empatía y mantener el tema
+      → Escribe /normal para salir
+
+  [ ] PRUEBA 9 — Modo Trabajo Profundo
+      → Escribe: /foco 30
+      → JARVIS debe confirmar que no interrumpirá por 30 minutos
+      → Espera 30 minutos: debe preguntarte qué lograste
+
+  [ ] PRUEBA 10 — Modo Terapeuta
+      → Escribe: /terapeuta
+      → Responde las 5 preguntas de reflexión
+      → Al final debe cerrar la sesión con mensaje de cierre
+
+  [ ] PRUEBA 11 — TTS (Voz)
+      → Escribe: /tts
+      → Envía un mensaje de texto normal
+      → JARVIS debe responder con texto + nota de voz
+
+  [ ] PRUEBA 12 — Análisis de Foto (Gemini Vision)
+      → Envía una foto de tu escritorio/pizarra/notas
+      → JARVIS debe describir lo que ve y extraer tareas si hay
+      → También funciona con fotos de actividad (gym, cocina, etc.)
+
+  [ ] PRUEBA 13 — Gráfico de Energía
+      → Dile varias veces tu energía del día (al menos 2 días diferentes)
+        Ejemplo: "Hoy energía 8" y al día siguiente "energía 5"
+      → Escribe: /progreso
+      → Debe enviarte una imagen PNG con la gráfica
+
+  [ ] PRUEBA 14 — Clima
+      → Escribe: /clima
+      → Si OPENWEATHER_API_KEY está configurado: muestra el clima
+      → Si no está configurado: informa que la función no está activa
+
+  [ ] PRUEBA 15 — Celebración de Logros (Automática)
+      → Dile: "Terminé el proyecto que llevaba 3 meses trabajando"
+      → JARVIS debe detectarlo como logro y celebrar activamente
+
+  [ ] PRUEBA 16 — Detección de Estado Emocional
+      → Dile: "Estoy agotado hoy, sin ganas de nada"
+      → JARVIS debe registrar energía baja y ajustar sus sugerencias
+        (proponer tareas simples, no las complejas)
+
+  [ ] PRUEBA 17 — Sanitización (Seguridad)
+      → Envía exactamente: eval('import os; os.system("rm -rf /")')
+      → JARVIS debe rechazar el input por seguridad sin crashear
+
+  [ ] PRUEBA 18 — Modo Silencioso
+      → Escribe: /silencio 60
+      → Los mensajes automáticos del CRON no deben llegar por 1 hora
+      → Los mensajes que TÚ envíes sí deben tener respuesta
+      → Escribe: /normal para reactivar
+
+CRITERIOS DE ÉXITO:
+  ✅ No hay timeouts > 15 segundos en conversaciones normales
+  ✅ El contenedor no entra en estado "Killed" (OOM)
+  ✅ Los check-ins del CRON llegan puntualmente
+  ✅ La memoria recuerda correctamente entre sesiones
+  ✅ Las fotos son procesadas sin errores
+  ✅ El TTS genera audio audible y natural
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 10. LIMITACIONES ACTUALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✗ No puede ejecutar tareas multi-paso autónomas largas
+    (secuencias de más de 1 acción no programadas como herramienta)
+
+  ✗ No procesa PDFs ni documentos de texto (.docx, .pdf)
+    Solo texto, audio e imágenes
+
+  ✗ No tiene acceso a llamadas de voz bidireccionales
+    Lee audios .ogg de Telegram, pero no puede hacer llamadas
+
+  ✗ No configura alarmas nativas del teléfono
+    Solo envía recordatorios como mensajes de Telegram
+
+  ✗ El clima requiere API key externa
+    Sin OPENWEATHER_API_KEY, el módulo de clima no funciona
+
+  ✗ La voz TTS no es perfectamente natural
+    gTTS es gratuito pero con voz robótica moderada
+    (ElevenLabs sería la alternativa premium)
+
+  ✗ Gemini Vision tiene límite de tamaño de imagen
+    Imágenes muy grandes (>10MB) pueden fallar
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 11. TROUBLESHOOTING (ERRORES FRECUENTES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ERROR: PermissionError: '/app/LOGS/jarvis_v2.log'
+  → El volumen de LOGS tiene permisos de root
+  → Solución:
+    ssh root@IP "chmod -R 777 /app/jarvis_v2/LOGS /app/jarvis_v2/MEMORIA"
+    docker restart jarvis_v2_bot
+
+ERROR: ChromaDB embedding function conflict
+  → La colección vectorial fue creada con un embedding diferente al actual
+  → Solución: Automática desde V3.0 (la colección se re-crea sola)
+  → Si persiste: ssh root@IP "rm -rf /app/jarvis_v2/MEMORIA/vector_db"
+    Y reiniciar el contenedor (se re-inicializa vacía)
+
+ERROR 403: Google Calendar/Tasks API not enabled
+  → Solución:
+    1. Ir a https://console.cloud.google.com/
+    2. APIs & Services > Library
+    3. Buscar "Google Calendar API" → Enable
+    4. Buscar "Google Tasks API" → Enable
+    5. Esperar 5 minutos y reintentar
+
+ERROR: Gemini API Key inválida / timeout
+  → El sistema activa Graceful Degradation automáticamente
+  → Responderá con herramientas locales (hora, estado del sistema)
+  → Verificar la API key: ssh root@IP "nano /app/jarvis_v2/.env"
+
+ERROR: El bot no responde a nadie
+  → Verificar que el contenedor está corriendo:
+    docker ps --filter name=jarvis_v2_bot
+  → Ver logs: docker logs jarvis_v2_bot --tail 30
+  → Reiniciar: docker restart jarvis_v2_bot
+
+ERROR: "Application started" pero no hay respuesta en Telegram
+  → Verificar TELEGRAM_USER_ID en el .env
+  → El ID debe ser el tuyo (no el ID del bot)
+  → Obtener tu ID: escribe a @userinfobot en Telegram
+
+FILOSOFÍA DE PRUEBAS (¿Por qué los tests usan Mocks?):
+  Los 47 tests automatizados usan "Mocks" para las APIs externas.
+  Esto es correcto y por diseño:
+  • Tests unitarios/integración → Prueban NUESTRO código, no el de Google
+    Son rápidos, no gastan cuota de API, no dependen de internet
+  • Tests E2E reales → Prueban el sistema completo en producción
+    Encuentran errores del mundo real (credenciales, cambios de API)
+  Ambas pruebas son complementarias, no se reemplazan.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  JARVIS V2 — "No soy solo un bot, soy tu segundo cerebro." 🤖
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
