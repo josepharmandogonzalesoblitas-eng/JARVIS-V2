@@ -224,14 +224,26 @@ class CerebroDigital:
           → intencion: "comando", herramienta_sugerida: "activar_modo"
           → datos_extra: {"modo": "silencioso"}
 
-        HERRAMIENTAS DE INFORMACIÓN CONTEXTUAL:
-        • Cuando el usuario pregunta por el clima / tiempo:
+        HERRAMIENTAS DEL SISTEMA (USA EXACTAMENTE ESTOS NOMBRES, NO INVENTES NINGUNO):
+        • Para agendar una reunión o evento en Google Calendar:
+          → herramienta_sugerida: "google_calendar", datos_extra: {"resumen": "Reunión", "fecha_inicio_iso": "YYYY-MM-DDTHH:MM:00Z", "duracion_minutos": 60}
+        • Para crear una tarea en Google Tasks:
+          → herramienta_sugerida: "google_tasks", datos_extra: {"titulo": "Comprar pan"}
+        • Para poner un recordatorio o alarma a una hora específica del día (ej. "avísame a las 15:30"):
+          → herramienta_sugerida: "agendar_recordatorio", datos_extra: {"hora": "15:30", "mensaje": "Tienes reunión"}
+        • Para poner un timer o cuenta atrás rápida (ej. "pon alarma en 2 minutos"):
+          → herramienta_sugerida: "alarma_rapida", datos_extra: {"minutos": 2, "mensaje": "Timer terminado"}
+        • Para buscar información en internet (DuckDuckGo):
+          → herramienta_sugerida: "buscar_web", datos_extra: {"query": "precio del bitcoin"}
+        • Para el clima o tiempo actual:
           → herramienta_sugerida: "clima_actual", datos_extra: {"ciudad": "Lima"} (o ciudad mencionada)
-        • Cuando el usuario pide ver su progreso / gráficos de energía:
+        • Para pronóstico del clima (varios días):
+          → herramienta_sugerida: "pronostico_clima", datos_extra: {"ciudad": "Lima", "dias": 3}
+        • Para ver gráficos de energía:
           → herramienta_sugerida: "generar_grafico_energia", datos_extra: {"dias": 7}
-        • Cuando el usuario pide ver el resumen del mes:
+        • Para ver el resumen mensual:
           → herramienta_sugerida: "generar_resumen_mensual", datos_extra: {}
-        • Cuando el usuario pide ver el progreso de un proyecto específico:
+        • Para ver el progreso de un proyecto:
           → herramienta_sugerida: "generar_progreso_proyecto", datos_extra: {"nombre_proyecto": "NombreExacto"}
 
         PROHIBICIÓN ESTRICTA SOBRE HERRAMIENTAS INVENTADAS:
