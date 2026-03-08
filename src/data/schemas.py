@@ -12,6 +12,7 @@ class Persona(BaseModel):
     profesion: str
     valores_clave: List[str] = Field(default_factory=list, description="Principios innegociables del usuario")
     metas_largo_plazo: List[str] = Field(default_factory=list)
+    tono_respuesta: str = Field(default="Normal", description="Tono de respuesta de la IA (Ej: Amigo_Sarcástico, Mentor_Relajado)")
     preferencias: Dict[str, str] = Field(
         default_factory=dict,
         description="Gustos y preferencias del usuario. Ej: {'color_favorito': 'azul', 'animal_favorito': 'gatos'}"

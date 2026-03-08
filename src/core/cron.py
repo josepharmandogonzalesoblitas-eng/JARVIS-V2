@@ -76,6 +76,36 @@ class CronManager:
         except Exception:
             return False
 
+    async def _es_momento_sensible(self) -> bool:
+        """Verifica si el usuario está en un momento emocionalmente vulnerable (energía baja o crisis)."""
+        try:
+            from src.core.emotion_engine import emotion_engine
+            from src.data import db_handler, schemas
+            
+            # Verificar patrón histórico reciente
+            nivel, dias = await emotion_engine.detectar_patron_negativo_historico(self.orquestador._historial_reciente)
+            if nivel >= 1:
+                return True
+                
+            # Verificar energía o ánimo del día actual en bitácora
+            bitacora = await db_handler.async_read_data("bitacora.json", schemas.GestorBitacora)
+            if bitacora.dia_actual:
+                if bitacora.dia_actual.nivel_energia <= 3:
+                    return True
+                animo_lower = bitacora.dia_actual.estado_animo.lower()
+                if any(p in animo_lower for p in ["triste", "mal", "deprim", "agotad", "solo", "ansios"]):
+                    return True
+            
+            # Verificar estado emocional
+            estado_emocional = await db_handler.async_read_data("estado_emocional.json", schemas.EstadoEmocionalSistema)
+            if estado_emocional.dias_negativos_consecutivos >= 2:
+                return True
+                
+            return False
+        except Exception as e:
+            logger.warning(f"Error verificando momento sensible: {e}")
+            return False
+
     async def _run_async_prompt(self, prompt: str):
         """Ejecuta el pipeline de IA y envía la respuesta por Telegram."""
         if self._es_modo_silencioso():
@@ -114,50 +144,91 @@ class CronManager:
         except Exception as e:
             logger.warning(f"No se pudo obtener clima para el matutino: {e}")
 
-        prompt = (
-            f"[SISTEMA - CHECK-IN MATUTINO] Buenos días. Revisa el contexto completo:\n"
-            f"1. Saluda al usuario por su nombre.\n"
-            f"2. Si tiene RUTINAS registradas, recuérdale las de esta mañana.\n"
-            f"3. Si tiene RECORDATORIOS pendientes, menciona los 2 más relevantes.\n"
-            f"4. Pregúntale cómo se siente para arrancar el día.\n"
-            f"{clima_str}\n"
-            f"Sé breve, cálido y energético. Máximo 4 frases."
-        )
+        es_sensible = await self._es_momento_sensible()
+        if es_sensible:
+            prompt = (
+                f"[SISTEMA - CHECK-IN MATUTINO] Buenos días. Revisa el contexto completo:\n"
+                f"1. Saluda al usuario por su nombre con mucha suavidad.\n"
+                f"2. NO menciones rutinas productivas ni recordatorios de trabajo.\n"
+                f"3. Pregúntale cómo se siente y si descansó bien, dándole espacio para expresarse.\n"
+                f"{clima_str}\n"
+                f"Sé muy empático, sin presión por ser productivo hoy."
+            )
+        else:
+            prompt = (
+                f"[SISTEMA - CHECK-IN MATUTINO] Buenos días. Revisa el contexto completo:\n"
+                f"1. Saluda al usuario por su nombre.\n"
+                f"2. Si tiene RUTINAS registradas, recuérdale las de esta mañana.\n"
+                f"3. Si tiene RECORDATORIOS pendientes, menciona los 2 más relevantes.\n"
+                f"4. Pregúntale cómo se siente para arrancar el día.\n"
+                f"{clima_str}\n"
+                f"Sé breve, cálido y energético. Máximo 4 frases."
+            )
         await self._run_async_prompt(prompt)
 
     async def _checkin_mediodia(self):
         logger.info("CRON: Check-in Mediodía")
-        prompt = (
-            "[SISTEMA - CHECK-IN MEDIODÍA] Es mediodía. Revisa el contexto:\n"
-            "1. Pregunta cómo va el día y si avanzó en sus tareas de la mañana.\n"
-            "2. Si tiene recordatorios para la tarde, recuérdaselos.\n"
-            "3. Si su energía de hoy es baja (≤4), sugiere tareas simples.\n"
-            "Sé breve y proactivo."
-        )
+        es_sensible = await self._es_momento_sensible()
+        if es_sensible:
+            prompt = (
+                "[SISTEMA - CHECK-IN MEDIODÍA] Es mediodía. Revisa el contexto:\n"
+                "1. Pregunta suavemente cómo se siente ahora mismo.\n"
+                "2. NO le preguntes por tareas pendientes ni avances de proyectos.\n"
+                "3. Sugiere que tome una pausa o coma algo rico.\n"
+                "Sé breve, un amigo que se preocupa sin exigir productividad."
+            )
+        else:
+            prompt = (
+                "[SISTEMA - CHECK-IN MEDIODÍA] Es mediodía. Revisa el contexto:\n"
+                "1. Pregunta cómo va el día y si avanzó en sus tareas de la mañana.\n"
+                "2. Si tiene recordatorios para la tarde, recuérdaselos.\n"
+                "3. Si su energía de hoy es baja (≤4), sugiere tareas simples.\n"
+                "Sé breve y proactivo."
+            )
         await self._run_async_prompt(prompt)
 
     async def _checkin_nocturno(self):
         logger.info("CRON: Check-in Nocturno")
-        prompt = (
-            "[SISTEMA - CHECK-IN NOCTURNO] Es tarde. Ayuda al usuario a cerrar el día:\n"
-            "1. Pregúntale cómo le fue y qué logró hoy.\n"
-            "2. Si tiene tareas pendientes sin completar, menciónalas brevemente.\n"
-            "3. Una pregunta breve de reflexión sobre su bienestar.\n"
-            "4. Cierre motivador o tranquilizador.\n"
-            "Sé cálido y breve."
-        )
+        es_sensible = await self._es_momento_sensible()
+        if es_sensible:
+            prompt = (
+                "[SISTEMA - CHECK-IN NOCTURNO] Es tarde. Ayuda al usuario a cerrar el día:\n"
+                "1. Valida que el día ha sido difícil y que está bien descansar.\n"
+                "2. NO menciones tareas pendientes ni metas no cumplidas.\n"
+                "3. Aconséjale relajarse y descansar bien para mañana.\n"
+                "Sé sumamente empático, cálido y reconfortante."
+            )
+        else:
+            prompt = (
+                "[SISTEMA - CHECK-IN NOCTURNO] Es tarde. Ayuda al usuario a cerrar el día:\n"
+                "1. Pregúntale cómo le fue y qué logró hoy.\n"
+                "2. Si tiene tareas pendientes sin completar, menciónalas brevemente.\n"
+                "3. Una pregunta breve de reflexión sobre su bienestar.\n"
+                "4. Cierre motivador o tranquilizador.\n"
+                "Sé cálido y breve."
+            )
         await self._run_async_prompt(prompt)
 
     async def _resumen_diario(self):
         logger.info("CRON: Resumen Diario")
-        prompt = (
-            "[SISTEMA - RESUMEN DIARIO] Son las 10pm. Cierre del día:\n"
-            "1. Lista tareas/recordatorios pendientes de hoy.\n"
-            "2. Indica cuántas están sin completar.\n"
-            "3. Evalúa el nivel de energía registrado hoy.\n"
-            "4. Frase motivadora corta + pregunta si quiere reprogramar algo para mañana.\n"
-            "Formato: resumen ejecutivo personal. Claro y conciso."
-        )
+        es_sensible = await self._es_momento_sensible()
+        if es_sensible:
+            prompt = (
+                "[SISTEMA - RESUMEN DIARIO] Son las 10pm. Cierre del día:\n"
+                "1. Reconoce que hoy no fue el mejor día energéticamente o anímicamente.\n"
+                "2. Ignora por completo las tareas o pendientes que no se hicieron.\n"
+                "3. Dale permiso explícito para desconectar y descansar sin culpa.\n"
+                "Formato: Amigo reconfortante y comprensivo. Sin presiones."
+            )
+        else:
+            prompt = (
+                "[SISTEMA - RESUMEN DIARIO] Son las 10pm. Cierre del día:\n"
+                "1. Lista tareas/recordatorios pendientes de hoy.\n"
+                "2. Indica cuántas están sin completar.\n"
+                "3. Evalúa el nivel de energía registrado hoy.\n"
+                "4. Frase motivadora corta + pregunta si quiere reprogramar algo para mañana.\n"
+                "Formato: resumen ejecutivo personal. Claro y conciso."
+            )
         await self._run_async_prompt(prompt)
 
     async def _ejecutar_backup_diario(self):
@@ -169,14 +240,24 @@ class CronManager:
     async def _seguimiento_metas_semanal(self):
         """Domingo 10:00 — Revisión de metas a largo plazo."""
         logger.info("CRON: Seguimiento Semanal de Metas")
-        prompt = (
-            "[SISTEMA - SEGUIMIENTO SEMANAL DE METAS] Es domingo. Momento de reflexionar:\n"
-            "1. Revisa las metas a largo plazo del usuario.\n"
-            "2. Para cada meta activa, pregunta si avanzó esta semana.\n"
-            "3. Si tiene proyectos activos, pregunta por el estado de sus tareas.\n"
-            "4. Anímalo a definir UNA acción concreta para la próxima semana.\n"
-            "Sé motivador y estratégico. Máximo 5 frases."
-        )
+        es_sensible = await self._es_momento_sensible()
+        if es_sensible:
+            prompt = (
+                "[SISTEMA - SEGUIMIENTO SEMANAL DE METAS] Es domingo. Momento de reflexionar:\n"
+                "1. Reconoce que la semana puede haber sido pesada.\n"
+                "2. NO le preguntes por metas ni proyectos.\n"
+                "3. Pregúntale qué actividad le daría paz o descanso hoy.\n"
+                "Sé un apoyo emocional, sin exigir rendimiento."
+            )
+        else:
+            prompt = (
+                "[SISTEMA - SEGUIMIENTO SEMANAL DE METAS] Es domingo. Momento de reflexionar:\n"
+                "1. Revisa las metas a largo plazo del usuario.\n"
+                "2. Para cada meta activa, pregunta si avanzó esta semana.\n"
+                "3. Si tiene proyectos activos, pregunta por el estado de sus tareas.\n"
+                "4. Anímalo a definir UNA acción concreta para la próxima semana.\n"
+                "Sé motivador y estratégico. Máximo 5 frases."
+            )
         await self._run_async_prompt(prompt)
 
     async def _validacion_rutinas(self):

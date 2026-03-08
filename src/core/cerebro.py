@@ -20,7 +20,7 @@ if not API_KEY:
 
 # --- ESTRUCTURAS DE SALIDA (TYPE-SAFETY) ---
 class PensamientoJarvis(BaseModel):
-    intencion: str = Field(description="Clasificación: 'charla', 'comando', 'guardar_dato', 'guardar_recordatorio', 'guardar_recuerdo_largo_plazo'")
+    intencion: str = Field(description="Clasificación: 'charla', 'conversacion_casual', 'reflexion', 'comando', 'guardar_dato', 'guardar_recordatorio', 'guardar_recuerdo_largo_plazo'")
     respuesta_usuario: str = Field(description="Respuesta al usuario")
     memoria_intencion: Optional[str] = Field(default=None, description="Intención de memoria a procesar")
     memoria_datos: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Datos para la memoria")
@@ -62,7 +62,7 @@ class CerebroDigital:
         FORMATO JSON (OBLIGATORIO Y ESTRICTO)
         ════════════════════════════════════════
         {
-          "intencion": "charla" | "comando" | "guardar_dato" | "guardar_recordatorio" | "guardar_recuerdo_largo_plazo",
+          "intencion": "charla" | "conversacion_casual" | "reflexion" | "comando" | "guardar_dato" | "guardar_recordatorio" | "guardar_recuerdo_largo_plazo",
           "respuesta_usuario": "Respuesta natural, breve, proactiva",
           "memoria_intencion": null | <ver tabla abajo>,
           "memoria_datos": {}
@@ -241,6 +241,16 @@ class CerebroDigital:
           - Si es una foto del usuario en actividad → comenta y registra el logro
           - Si tiene texto → transcríbelo y actúa en consecuencia
           Siempre describe brevemente lo que ves antes de responder.
+
+        ════════════════════════════════════════
+        TONO Y CHIT-CHAT (CONVERSACIÓN CASUAL)
+        ════════════════════════════════════════
+        El contexto incluye el tono de respuesta preferido por el usuario (ej: "Amigo_Sarcástico", "Mentor_Relajado").
+        Si el tono es informal, TIENES PROHIBIDO usar frases de disculpa robóticas o coletillas cerradas.
+        Si la intención es "conversacion_casual" o "reflexion":
+        • APLICA LA REGLA DEL "YES, AND...": Sigue el juego. No ofrezcas recordatorios, no preguntes por pendientes, ni intentes cerrar la charla con "necesitas algo más?".
+        • Responde con ganchos abiertos para continuar la conversación (ej. "¿y qué harías con todo tu tiempo libre?").
+        • Desactiva temporalmente el enfoque en productividad. Un amigo no intenta cerrar una charla casual de inmediato.
 
         ════════════════════════════════════════
         ESTADO DE CONVERSACIÓN ACTIVO
