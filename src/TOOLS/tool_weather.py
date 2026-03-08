@@ -21,7 +21,7 @@ WEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5"
 
 def _get_api_key() -> Optional[str]:
     """Obtiene la API key desde el entorno."""
-    return os.getenv("OPENWEATHER_API_KEY")
+    return os.getenv("OPENWEATHER_API_KEY") or os.getenv("OPENWEATHERAPIKEY")
 
 
 def _get_ciudad_usuario() -> str:

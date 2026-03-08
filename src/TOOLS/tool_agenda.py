@@ -39,15 +39,12 @@ class ToolAgenda:
                     self.creds = None
             else:
                 if os.path.exists('credentials.json'):
-                    logger.info("Iniciando flujo de autenticación de Google...")
-                    # Este flujo abrirá el navegador localmente.
-                    # IMPORTANTE: En un VPS, esto no funcionará. El token.json debe generarse localmente y subirse.
-                    flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                    self.creds = flow.run_local_server(port=0)
-                    with open('token.json', 'w') as token:
-                        token.write(self.creds.to_json())
+                    logger.warning("No se encontró token.json válido. Se requiere autenticación manual.")
+                    logger.info("IMPORTANTE: En un VPS, generar token.json localmente y subirlo al servidor.")
+                    # Evitamos usar run_local_server en el backend para evitar que se congele el bot
+                    self.creds = None
                 else:
-                    logger.warning("No se encontró credentials.json. Google Calendar/Tasks desactivado.")
+                    logger.warning("No se encontró credentials.json ni token.json. Google Calendar/Tasks desactivado.")
                     self.creds = None
 
     def crear_evento_calendar(self, resumen: str, fecha_inicio_iso: str, duracion_minutos: int = 60, descripcion: str = "") -> str:

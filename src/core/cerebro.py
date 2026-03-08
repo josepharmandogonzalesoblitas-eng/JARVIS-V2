@@ -225,11 +225,13 @@ class CerebroDigital:
           → datos_extra: {"modo": "silencioso"}
 
         HERRAMIENTAS DEL SISTEMA (USA EXACTAMENTE ESTOS NOMBRES, NO INVENTES NINGUNO):
-        • Para agendar una reunión o evento en Google Calendar:
+        • Para agendar una reunión o evento en Google Calendar (DEBES PREGUNTAR LA HORA EXACTA ANTES DE USARLA SI NO LA SABES):
           → herramienta_sugerida: "google_calendar", datos_extra: {"resumen": "Reunión", "fecha_inicio_iso": "YYYY-MM-DDTHH:MM:00Z", "duracion_minutos": 60}
-        • Para crear una tarea en Google Tasks:
+          (¡IMPORTANTE! Si el usuario te pide explícitamente "pon en mi calendario", "agéndalo en mi calendario" u "organiza una cita", DEBES USAR "google_calendar" con intencion "comando". No finjas que lo agendaste con intencion "charla".)
+        • Para crear una tarea en Google Tasks (NO REQUIERE HORA):
           → herramienta_sugerida: "google_tasks", datos_extra: {"titulo": "Comprar pan"}
-        • Para poner un recordatorio o alarma a una hora específica del día (ej. "avísame a las 15:30"):
+          (¡IMPORTANTE! Si el usuario te pide explícitamente "añade esto a mis tareas" o "pon en mi lista de tareas", DEBES USAR "google_tasks".)
+        • Para poner un recordatorio o alarma a una hora específica del día (ej. "avísame a las 15:30", "recuérdame a las 7am"):
           → herramienta_sugerida: "agendar_recordatorio", datos_extra: {"hora": "15:30", "mensaje": "Tienes reunión"}
         • Para poner un timer o cuenta atrás rápida (ej. "pon alarma en 2 minutos"):
           → herramienta_sugerida: "alarma_rapida", datos_extra: {"minutos": 2, "mensaje": "Timer terminado"}
@@ -247,9 +249,15 @@ class CerebroDigital:
           → herramienta_sugerida: "generar_progreso_proyecto", datos_extra: {"nombre_proyecto": "NombreExacto"}
 
         PROHIBICIÓN ESTRICTA SOBRE HERRAMIENTAS INVENTADAS:
-        NUNCA inventes herramientas que no estén explícitamente listadas arriba (como 'mostrarestructuraaportes', 'generar_borrador', etc.). 
-        Si el usuario te pide "analiza esto", "haz un borrador", "crea un plan", "resume esto", DEBES hacerlo INMEDIATAMENTE tú mismo usando la 'intencion': 'charla'. 
-        Escribe el borrador o plan directamente en el campo 'respuesta_usuario' con todo tu conocimiento como LLM. Nunca prometas "te lo preparo en un momento".
+        NUNCA inventes herramientas que no estén explícitamente listadas arriba (como 'mostrarestructuraaportes', 'generar_borrador', 'generaraudiochiste', etc.). 
+        Si el usuario te pide "analiza esto", "haz un borrador", "crea un plan", "resume esto", o cuenta un chiste, DEBES hacerlo INMEDIATAMENTE tú mismo usando la 'intencion': 'charla'. 
+        Escribe el borrador, plan o chiste directamente en el campo 'respuesta_usuario' con todo tu conocimiento como LLM. Nunca prometas "te lo preparo en un momento".
+
+        REGLA SOBRE LA RESPUESTA CON HERRAMIENTAS:
+        Si usas una herramienta (intencion: 'comando'), tu 'respuesta_usuario' DEBE asumir que la acción se completará o que ya tienes la información. 
+        NUNCA digas "Dame un segundo, voy a revisar...", "Déjame buscarte...", "Voy a agendarlo". 
+        SIEMPRE di la acción como un hecho afirmativo: "Aquí tienes la información:", "¡Listo! Ya procesé tu solicitud de agenda.", "Te comparto el clima de hoy:".
+        El sistema añadirá el resultado real de la herramienta después de tu mensaje, por lo que una respuesta directa y afirmativa funciona mejor.
 
         ANÁLISIS DE IMÁGENES:
         • Si se adjunta una imagen al mensaje, analízala en detalle:
