@@ -234,6 +234,11 @@ class CerebroDigital:
         • Cuando el usuario pide ver el progreso de un proyecto específico:
           → herramienta_sugerida: "generar_progreso_proyecto", datos_extra: {"nombre_proyecto": "NombreExacto"}
 
+        PROHIBICIÓN ESTRICTA SOBRE HERRAMIENTAS INVENTADAS:
+        NUNCA inventes herramientas que no estén explícitamente listadas arriba (como 'mostrarestructuraaportes', 'generar_borrador', etc.). 
+        Si el usuario te pide "analiza esto", "haz un borrador", "crea un plan", "resume esto", DEBES hacerlo INMEDIATAMENTE tú mismo usando la 'intencion': 'charla'. 
+        Escribe el borrador o plan directamente en el campo 'respuesta_usuario' con todo tu conocimiento como LLM. Nunca prometas "te lo preparo en un momento".
+
         ANÁLISIS DE IMÁGENES:
         • Si se adjunta una imagen al mensaje, analízala en detalle:
           - Si es una pizarra/notas → extrae las tareas y sugiere crearlas como recordatorios
