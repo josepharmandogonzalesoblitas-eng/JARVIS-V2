@@ -34,9 +34,26 @@ class MemoryManager:
             return f"Error al guardar: {str(e)}"
 
     async def guardar_recordatorio(self, descripcion: str, contexto: str = "general") -> str:
-        """Guarda un recordatorio a corto plazo"""
+        """Guarda un recordatorio a corto plazo.
+
+        Idempotencia: no crea duplicados si el mismo recordatorio pendiente ya existe.
+        """
         try:
+            if not descripcion or not str(descripcion).strip():
+                return "Error: descripción del recordatorio vacía."
+
+            descripcion = str(descripcion).strip()
             contexto_obj = await db_handler.async_read_data("contexto.json", schemas.GestorContexto)
+
+            # Idempotencia: evitar duplicados de recordatorios pendientes (misma descripción)
+            pendientes_existentes = {
+                r.descripcion.strip().lower()
+                for r in contexto_obj.recordatorios_pendientes
+                if not r.completado
+            }
+            if descripcion.lower() in pendientes_existentes:
+                return f"Recordatorio ya registrado (sin duplicar): {descripcion}"
+
             recordatorio = schemas.Recordatorio(
                 descripcion=descripcion,
                 contexto_asociado=contexto
@@ -200,14 +217,21 @@ class MemoryManager:
                     datos.get("descripcion", "")
                 )
             elif intencion == "actualizar_estado_animo":
+                val_energia = datos.get("nivel_energia")
+                # Type-Safety: el LLM puede devolver strings no numéricos ("desconocido", None, etc.)
+                try:
+                    energia = int(val_energia) if val_energia is not None else 5
+                    energia = max(1, min(10, energia))  # clamp al rango válido [1-10]
+                except (ValueError, TypeError):
+                    energia = 5  # Graceful Degradation: valor neutro por defecto
                 return await self.actualizar_estado_animo(
-                    datos.get("estado_animo", "estable"),
-                    int(datos.get("nivel_energia", 5))
+                    datos.get("estado_animo", "estable") or "estable",
+                    energia
                 )
             elif intencion == "nuevo_recordatorio":
                 return await self.guardar_recordatorio(
                     datos.get("descripcion"),
-                    datos.get("contexto", "general")
+                    datos.get("contexto") or "general"  # Handles explicit None from LLM
                 )
             elif intencion == "nuevo_recuerdo_largo_plazo":
                 return await self.guardar_recuerdo_largo_plazo(

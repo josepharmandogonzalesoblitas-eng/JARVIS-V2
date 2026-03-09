@@ -3,6 +3,5 @@
 venv/
 __pycache__/
 LOGS/
-MEMORIA/vector_db/
-.env
+
 *.pyc

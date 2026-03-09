@@ -69,7 +69,7 @@ class BitacoraSummary(BaseModel):
 class Recordatorio(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     descripcion: str
-    contexto_asociado: str = Field(description="Ej: 'banco', 'supermercado', 'tiempo_libre'")
+    contexto_asociado: str = Field(default="general", description="Ej: 'banco', 'supermercado', 'tiempo_libre'")
     completado: bool = False
     fecha_creacion: datetime = Field(default_factory=datetime.now)
 

@@ -30,10 +30,39 @@ COLORES = {
 
 
 def _setup_matplotlib():
-    """Configura matplotlib con backend no-GUI."""
+    """Configura matplotlib con backend no-GUI y soporte de emoji en títulos."""
     try:
+        import warnings
         import matplotlib
         matplotlib.use('Agg')
+
+        # Graceful Degradation: intentar configurar fuente con soporte emoji
+        # (Segoe UI Emoji en Windows, Noto Emoji en Linux/Mac).
+        # Si ninguna está disponible, suprimir los UserWarning de glifos
+        # para no contaminar los logs de producción.
+        try:
+            from matplotlib.font_manager import FontManager
+            _fm = FontManager()
+            _disponibles = {f.name for f in _fm.ttflist}
+            _emoji_fonts = [f for f in [
+                'Segoe UI Emoji',     # Windows 10+
+                'Noto Emoji',         # Linux
+                'Noto Color Emoji',   # Linux (color)
+                'Apple Color Emoji',  # macOS
+            ] if f in _disponibles]
+            if _emoji_fonts:
+                matplotlib.rcParams['font.family'] = ['DejaVu Sans'] + _emoji_fonts
+            else:
+                # Sin fuente emoji disponible — suprimir warning de glifos (solo informativos)
+                warnings.filterwarnings(
+                    'ignore',
+                    message=r'Glyph \d+ .* missing from font',
+                    category=UserWarning,
+                    module='matplotlib'
+                )
+        except Exception:
+            pass  # Fail-Safe: si falla la detección de fuentes, continuar igual
+
         import matplotlib.pyplot as plt
         import matplotlib.gridspec as gridspec
         return plt, gridspec

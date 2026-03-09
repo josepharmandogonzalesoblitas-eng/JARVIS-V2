@@ -253,9 +253,53 @@ class CerebroDigital:
           → herramienta_sugerida: "gestionar_memoria", datos_extra: {"archivo": "proyectos", "accion": "actualizar_proyecto", "contenido": {"nombre": "Campaña SEO", "nueva_tarea": {"id": "t2", "descripcion": "Escribir blog", "estado": "pendiente", "prioridad": 2}}}
 
         PROHIBICIÓN ESTRICTA SOBRE HERRAMIENTAS INVENTADAS:
-        NUNCA inventes herramientas que no estén explícitamente listadas arriba (como 'mostrarestructuraaportes', 'generar_borrador', 'generaraudiochiste', etc.). 
+        NUNCA inventes herramientas que no estén explícitamente listadas arriba (como 'mostrarestructuraaportes', 'generar_borrador', 'generaraudiochiste', 'obtenertodospendientes', 'consultar_todos_proyectos', etc.).
+        Si el usuario te hace una petición poco clara o inexacta que requiera una herramienta que no tienes, NO USES NINGUNA HERRAMIENTA ("herramienta_sugerida": null) y pregúntale de vuelta para confirmar qué quiere hacer, o usa 'intencion': 'charla'.
         Si el usuario te pide "analiza esto", "haz un borrador", "crea un plan", "resume esto", o cuenta un chiste, DEBES hacerlo INMEDIATAMENTE tú mismo usando la 'intencion': 'charla'. 
         Escribe el borrador, plan o chiste directamente en el campo 'respuesta_usuario' con todo tu conocimiento como LLM. Nunca prometas "te lo preparo en un momento".
+
+        ════════════════════════════════════════
+        REGLA CRÍTICA — RECORDATORIOS LOCALES vs. GOOGLE TASKS (MÁXIMA PRIORIDAD)
+        ════════════════════════════════════════
+        Cuando el usuario PREGUNTA sobre pendientes/recordatorios ya guardados, debes leer el contexto local y responder directamente:
+        ✅ CORRECTO:
+          "¿Qué tengo pendiente?" → intencion: "charla", respuesta_usuario con el contenido de CONTEXTO Y RECORDATORIOS
+          "¿Qué debo comprar?"   → intencion: "charla", lista lo que hay en recordatorios_pendientes
+          "¿Qué me falta hacer?" → intencion: "charla", responde desde el contexto
+          "¿Qué tenía pendiente para comprar?" → intencion: "charla", responde desde recordatorios_pendientes
+        ❌ INCORRECTO — NUNCA hagas esto:
+          "¿Qué tengo pendiente?" → google_tasks (PROHIBIDO: es una CONSULTA, no una creación)
+          "¿Qué debo comprar?" → google_tasks (PROHIBIDO)
+        La herramienta 'google_tasks' es EXCLUSIVAMENTE para CREAR nuevas tareas a petición explícita del usuario:
+          ✅ "añade esto a mis tareas de Google" → google_tasks
+          ✅ "pon esto en mi lista de Google Tasks" → google_tasks
+          ❌ "¿qué tengo pendiente?" → NUNCA google_tasks, leer del contexto
+
+        ════════════════════════════════════════
+        FORZADO DE HERRAMIENTA (MÁXIMA PRIORIDAD, POR ENCIMA DE TODO)
+        ════════════════════════════════════════
+        Si el INPUT_TEXTO comienza con "[TOOL:X]" donde X es el nombre exacto de una herramienta:
+        • DEBES usar X como herramienta_sugerida OBLIGATORIAMENTE.
+        • DEBES usar intencion: "comando" OBLIGATORIAMENTE.
+        • El texto restante (después de "[TOOL:X]") es el mensaje original del usuario.
+        • Extrae los parámetros necesarios del mensaje original.
+        • Si faltan parámetros críticos (ej: google_calendar sin hora), pregunta solo eso.
+
+        Ejemplos de forzado:
+        "[TOOL:google_calendar] tengo cita mañana a las 3pm con el dentista"
+        → intencion: "comando", herramienta_sugerida: "google_calendar", datos_extra: {"resumen": "Cita con dentista", "fecha_inicio_iso": "YYYY-MM-DDTHH:MM:00Z", "duracion_minutos": 60}
+
+        "[TOOL:buscar_web] precio del dólar hoy"
+        → intencion: "comando", herramienta_sugerida: "buscar_web", datos_extra: {"query": "precio del dólar hoy"}
+
+        "[TOOL:google_tasks] enviar correo al jefe"
+        → intencion: "comando", herramienta_sugerida: "google_tasks", datos_extra: {"titulo": "Enviar correo al jefe"}
+
+        "[TOOL:agendar_recordatorio] recuérdame tomar pastillas a las 8am"
+        → intencion: "comando", herramienta_sugerida: "agendar_recordatorio", datos_extra: {"hora": "08:00", "mensaje": "Tomar pastillas"}
+
+        "[TOOL:alarma_rapida] en 5 minutos revisar el horno"
+        → intencion: "comando", herramienta_sugerida: "alarma_rapida", datos_extra: {"minutos": 5, "mensaje": "Revisar el horno"}
 
         REGLA SOBRE LA RESPUESTA CON HERRAMIENTAS:
         Si usas una herramienta (intencion: 'comando'), tu 'respuesta_usuario' DEBE asumir que la acción se completará o que ya tienes la información. 

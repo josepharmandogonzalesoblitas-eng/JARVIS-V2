@@ -29,11 +29,11 @@ def get_best_model_name():
             return pro_models[0].replace("models/", "")
             
         # Fallback a un modelo conocido si todo falla
-        return "gemini-1.5-flash"
+        return "gemini-1.5-flash-8b"
 
     except Exception as e:
-        logger.warning(f"No se pudieron listar los modelos de Gemini ({e}). Usando fallback 'gemini-1.5-flash'.")
-        return "gemini-1.5-flash"
+        logger.warning(f"No se pudieron listar los modelos de Gemini ({e}). Usando fallback 'gemini-1.5-flash-8b'.")
+        return "gemini-1.5-flash-8b"
 
 if __name__ == '__main__':
     # Esto es para probar el script directamente

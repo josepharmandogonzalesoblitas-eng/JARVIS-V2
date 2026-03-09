@@ -12,7 +12,16 @@ from typing import Dict, Any
 
 logger = logging.getLogger("tool_system")
 
-from duckduckgo_search import DDGS
+try:
+    from duckduckgo_search import DDGS
+    _DDGS_SUPPORTS_HEADERS = True
+except ImportError:
+    try:
+        from ddgs import DDGS
+        _DDGS_SUPPORTS_HEADERS = False
+    except ImportError:
+        DDGS = None
+        _DDGS_SUPPORTS_HEADERS = False
 
 import pytz
 
@@ -46,23 +55,32 @@ def ejecutar_herramienta_sistema(nombre: str, params: Dict[str, Any]) -> str:
             query = params.get("query")
             if not query:
                 return "Error: No se proporcionó un término de búsqueda."
-                
+
+            # Graceful Degradation: si ninguna librería está disponible
+            if DDGS is None:
+                return "Error: Librería de búsqueda web no disponible. Instala duckduckgo_search."
+
             logger.info(f"Buscando en la web: {query}")
             resultados = []
-            # Añadir User-Agent para evitar bloqueos
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-            }
-            with DDGS(headers=headers) as ddgs:
-                # Buscamos los 3 primeros resultados
+
+            # Fail-Safe: pasar headers solo si la librería los soporta
+            ua = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                  'AppleWebKit/537.36 (KHTML, like Gecko) '
+                  'Chrome/120.0.0.0 Safari/537.36')
+            ddgs_kwargs = {"headers": {"User-Agent": ua}} if _DDGS_SUPPORTS_HEADERS else {}
+
+            with DDGS(**ddgs_kwargs) as ddgs:
                 for r in ddgs.text(query, max_results=3):
-                    resultados.append(f"- {r.get('title')}: {r.get('body')} ({r.get('href')})")
-            
+                    titulo = r.get('title', 'Sin título')
+                    cuerpo = r.get('body', '')
+                    link = r.get('href', '')
+                    resultados.append(f"🔹 **{titulo}**\n{cuerpo}\n🔗 {link}\n")
+
             if not resultados:
                 return f"No encontré información en internet sobre '{query}'."
-                
+
             res_str = "\n".join(resultados)
-            return f"Resultados web para '{query}':\n{res_str}"
+            return f"🌐 **Resultados web para '{query}':**\n\n{res_str}"
             
         elif nombre == "agendar_recordatorio":
             hora_hhmm = params.get("hora")

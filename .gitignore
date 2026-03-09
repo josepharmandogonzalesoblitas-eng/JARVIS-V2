@@ -26,6 +26,9 @@ jarvis_deploy.tar.gz
 credentials.json
 token.json
 
+# Sesiones de Telegram (contienen credenciales de autenticación)
+*.session
+
 # Carpetas ocultas del sistema (opcional)
 .DS_Store
 Thumbs.db

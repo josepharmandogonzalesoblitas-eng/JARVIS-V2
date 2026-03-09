@@ -51,7 +51,11 @@ async def async_ejecutar_memoria(datos: Dict[str, Any]) -> str:
                 if "descripcion" in contenido:
                     proy_actual.descripcion = contenido["descripcion"]
                 if "nueva_tarea" in contenido:
-                    nueva_tarea = schemas.Tarea(**contenido["nueva_tarea"])
+                    import uuid
+                    task_data = contenido["nueva_tarea"]
+                    if "id" not in task_data or task_data["id"] in [t.id for t in proy_actual.tareas_pendientes]:
+                        task_data["id"] = str(uuid.uuid4())[:8]
+                    nueva_tarea = schemas.Tarea(**task_data)
                     proy_actual.tareas_pendientes.append(nueva_tarea)
                 proy_actual.ultima_actualizacion = datetime.now()
                 await db_handler.async_save_data("proyectos.json", gestor)
@@ -76,8 +80,13 @@ async def async_ejecutar_memoria(datos: Dict[str, Any]) -> str:
                     gestor_bitacora.dia_actual = schemas.RegistroDiario(fecha=hoy_str, nivel_energia=5, estado_animo="Neutro")
 
                 dia = gestor_bitacora.dia_actual
-                if "nivel_energia" in contenido: dia.nivel_energia = contenido["nivel_energia"]
-                if "estado_animo" in contenido: dia.estado_animo = contenido["estado_animo"]
+                if "nivel_energia" in contenido and contenido["nivel_energia"] is not None:
+                    try:
+                        dia.nivel_energia = int(contenido["nivel_energia"])
+                    except (ValueError, TypeError):
+                        pass
+                if "estado_animo" in contenido and contenido["estado_animo"] is not None:
+                    dia.estado_animo = str(contenido["estado_animo"])
                 if "nuevo_evento" in contenido: dia.eventos_importantes.append(contenido["nuevo_evento"])
                 if "notas_ia" in contenido: dia.notas_ia = contenido["notas_ia"]
                 await db_handler.async_save_data("bitacora.json", gestor_bitacora)
@@ -212,10 +221,13 @@ def ejecutar_memoria(datos: Dict[str, Any]) -> str:
                     )
 
                 dia = gestor_bitacora.dia_actual
-                if "nivel_energia" in contenido:
-                    dia.nivel_energia = contenido["nivel_energia"]
-                if "estado_animo" in contenido:
-                    dia.estado_animo = contenido["estado_animo"]
+                if "nivel_energia" in contenido and contenido["nivel_energia"] is not None:
+                    try:
+                        dia.nivel_energia = int(contenido["nivel_energia"])
+                    except (ValueError, TypeError):
+                        pass
+                if "estado_animo" in contenido and contenido["estado_animo"] is not None:
+                    dia.estado_animo = str(contenido["estado_animo"])
                 if "nuevo_evento" in contenido:
                     dia.eventos_importantes.append(contenido["nuevo_evento"])
                 if "notas_ia" in contenido:

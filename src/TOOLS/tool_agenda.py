@@ -59,8 +59,8 @@ class ToolAgenda:
             fin = inicio + datetime.timedelta(minutes=duracion_minutos)
             
             # IDEMPOTENCIA: Buscar eventos existentes en una ventana de +/- 5 minutos
-            time_min = (inicio - datetime.timedelta(minutes=5)).isoformat() + "Z"
-            time_max = (inicio + datetime.timedelta(minutes=5)).isoformat() + "Z"
+            time_min = (inicio - datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            time_max = (inicio + datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
             existing_events = service.events().list(
                 calendarId='primary',

@@ -18,6 +18,22 @@ logger = logging.getLogger("orquestador")
 # Marcador especial para archivos adjuntos generados por herramientas
 ARCHIVO_ADJUNTO_PREFIX = "__ARCHIVO_ADJUNTO__:"
 
+# Marcador para indicar al bot de Telegram que debe mostrar menú de herramientas
+MENU_HERRAMIENTAS_MARKER = "__MOSTRAR_MENU_HERRAMIENTAS__:"
+
+# Palabras clave que sugieren que el usuario quiere usar una herramienta
+# pero la IA no fue capaz de identificar cuál
+_PALABRAS_CLAVE_HERRAMIENTAS = [
+    "agenda", "agend", "calendar", "evento", "cita", "reunión", "reunion",
+    "tarea", "tasks", "lista", "pendiente",
+    "recordatorio", "recuérdame", "recuerdame", "avísame", "avisame",
+    "alarma", "timer", "minutos",
+    "busca", "buscar", "buscarme", "investiga", "internet", "web",
+    "clima", "tiempo", "lluvia", "temperatura",
+    "gráfico", "grafico", "progreso", "resumen",
+    "proyecto", "proyectos",
+]
+
 
 class Orquestador:
     """
@@ -174,6 +190,16 @@ class Orquestador:
                     if resultado_tool.startswith(ARCHIVO_ADJUNTO_PREFIX):
                         self._pending_attachment = resultado_tool[len(ARCHIVO_ADJUNTO_PREFIX):]
                         # La respuesta de texto es la del LLM (ya tiene descripción)
+                    elif "no encontrada en el módulo" in resultado_tool or "no encontrada" in resultado_tool.lower():
+                        # ─── FALLBACK: La IA inventó una herramienta inexistente ──────────────
+                        # Si el usuario parece querer algo con herramientas, mostrar el menú
+                        texto_lower = (texto_limpio or "").lower()
+                        parece_herramienta = any(kw in texto_lower for kw in _PALABRAS_CLAVE_HERRAMIENTAS)
+                        if parece_herramienta and usuario_id != "SISTEMA_CRON":
+                            logger.warning(f"Herramienta inventada: '{pensamiento.herramienta_sugerida}'. Mostrando menú.")
+                            respuesta_final = MENU_HERRAMIENTAS_MARKER + respuesta_final
+                        else:
+                            respuesta_final += f"\n\n{resultado_tool}"
                     else:
                         respuesta_final += f"\n\n{resultado_tool}"
 
@@ -183,6 +209,15 @@ class Orquestador:
                         primera_pregunta = conversation_state_manager.siguiente_pregunta_terapeuta()
                         if primera_pregunta:
                             respuesta_final += f"\n\n{primera_pregunta}"
+
+                else:
+                    # ─── FALLBACK: La IA dijo "comando" pero no eligió herramienta ──────────
+                    # Solo mostramos el menú si el mensaje parece ser una solicitud de herramienta
+                    texto_lower = (texto_limpio or "").lower()
+                    parece_herramienta = any(kw in texto_lower for kw in _PALABRAS_CLAVE_HERRAMIENTAS)
+                    if parece_herramienta and usuario_id != "SISTEMA_CRON":
+                        logger.info("Intención 'comando' sin herramienta detectada. Mostrando menú de herramientas.")
+                        respuesta_final = MENU_HERRAMIENTAS_MARKER + respuesta_final
 
             # ─── POST-PROCESAMIENTO EMOCIONAL ─────────────────────────────────
 

@@ -4,7 +4,7 @@ pydantic
 schedule
 python-dotenv
 chromadb
-duckduckgo-search
+ddgs
 psutil
 google-api-python-client
 google-auth-httplib2
