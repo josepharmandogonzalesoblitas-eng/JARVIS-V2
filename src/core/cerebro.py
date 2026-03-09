@@ -108,7 +108,7 @@ class CerebroDigital:
           datos: {"descripcion": "comprar leche", "contexto": "supermercado"}
 
         EVENTOS Y HECHOS DE VIDA:
-        • "nuevo_recuerdo_largo_plazo" → fechas importantes, logros, eventos de vida, datos únicos
+        • "nuevo_recuerdo_largo_plazo" → fechas importantes, logros, eventos de vida, datos médicos importantes, alergias, o datos únicos para recordar para siempre.
           datos: {"texto": "El hijo del usuario nació el 16 de febrero de 2026", "tipo": "familia"}
 
         ════════════════════════════════════════
@@ -247,6 +247,10 @@ class CerebroDigital:
           → herramienta_sugerida: "generar_resumen_mensual", datos_extra: {}
         • Para ver el progreso de un proyecto:
           → herramienta_sugerida: "generar_progreso_proyecto", datos_extra: {"nombre_proyecto": "NombreExacto"}
+        • Para gestionar proyectos en la base de datos local (crear o agregar tareas):
+          → herramienta_sugerida: "gestionar_memoria", datos_extra: {"archivo": "proyectos", "accion": "nuevo_proyecto", "contenido": {"nombre": "Campaña SEO", "descripcion": "Mejorar SEO", "stack_tecnologico": [], "estado_actual": "iniciado", "tareas_pendientes": [{"id": "t1", "descripcion": "Investigar", "estado": "pendiente", "prioridad": 1}]}}
+        • Para actualizar un proyecto existente (agregar tarea):
+          → herramienta_sugerida: "gestionar_memoria", datos_extra: {"archivo": "proyectos", "accion": "actualizar_proyecto", "contenido": {"nombre": "Campaña SEO", "nueva_tarea": {"id": "t2", "descripcion": "Escribir blog", "estado": "pendiente", "prioridad": 2}}}
 
         PROHIBICIÓN ESTRICTA SOBRE HERRAMIENTAS INVENTADAS:
         NUNCA inventes herramientas que no estén explícitamente listadas arriba (como 'mostrarestructuraaportes', 'generar_borrador', 'generaraudiochiste', etc.). 

@@ -152,6 +152,8 @@ class Orquestador:
                     pensamiento.memoria_datos or {}
                 )
 
+            print(f"\n[DEBUG PENSAMIENTO]: {pensamiento.model_dump_json(indent=2)}\n")
+            
             # 4. EJECUCIÓN DE INTENCIÓN (Router Lógico)
             respuesta_final = pensamiento.respuesta_usuario
 
@@ -160,10 +162,13 @@ class Orquestador:
 
             elif pensamiento.intencion == "comando":
                 if pensamiento.herramienta_sugerida and pensamiento.herramienta_sugerida != "None":
-                    resultado_tool = self._ejecutar_herramienta(
-                        pensamiento.herramienta_sugerida,
-                        pensamiento.datos_extra or {}
-                    )
+                    if pensamiento.herramienta_sugerida == "gestionar_memoria":
+                        resultado_tool = await self._ejecutar_memoria_async(pensamiento.datos_extra or {})
+                    else:
+                        resultado_tool = self._ejecutar_herramienta(
+                            pensamiento.herramienta_sugerida,
+                            pensamiento.datos_extra or {}
+                        )
 
                     # Detectar archivos adjuntos generados por herramientas
                     if resultado_tool.startswith(ARCHIVO_ADJUNTO_PREFIX):
