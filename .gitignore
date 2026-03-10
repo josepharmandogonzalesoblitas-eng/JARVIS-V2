@@ -29,6 +29,22 @@ token.json
 # Sesiones de Telegram (contienen credenciales de autenticación)
 *.session
 
+# Archivos de memoria JARVIS (datos personales del usuario — NO commitear)
+# Usar MEMORIA/*.example.json como plantillas de referencia
+MEMORIA/bitacora.json
+MEMORIA/contexto.json
+MEMORIA/entorno.json
+MEMORIA/estado_emocional.json
+MEMORIA/persona.json
+MEMORIA/proyectos.json
+
+# Scripts de prueba locales (contienen lógica que depende del .env personal)
+script_cron_riguroso.py
+script_cron_riguroso_estados.py
+script_real_telegram.py
+simulador_jarvis.py
+test_e2e_telegram_injector.py
+
 # Carpetas ocultas del sistema (opcional)
 .DS_Store
 Thumbs.db
