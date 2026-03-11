@@ -94,6 +94,46 @@ class ToolAgenda:
         """Añade una tarea a Google Tasks, previniendo duplicados (Idempotencia)."""
         if not self.creds:
             return "Error: No hay conexión con Google Tasks (falta token.json)."
+    
+    def borrar_eventos_mes_actual(self, texto_a_buscar: str) -> str:
+        """Borra todos los eventos del mes actual que contengan el texto_a_buscar."""
+        if not self.creds:
+            return "Error: No hay conexión con Google Calendar (falta token.json)."
+
+        try:
+            service = build('calendar', 'v3', credentials=self.creds)
+            
+            # Rango del mes actual
+            now = datetime.datetime.now()
+            start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            next_month = (start_of_month.replace(day=28) + datetime.timedelta(days=4))
+            end_of_month = next_month - datetime.timedelta(days=next_month.day)
+            
+            time_min = start_of_month.isoformat() + 'Z'
+            time_max = end_of_month.isoformat() + 'Z'
+
+            events_result = service.events().list(
+                calendarId='primary', 
+                timeMin=time_min,
+                timeMax=time_max,
+                q=texto_a_buscar,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+            
+            events = events_result.get('items', [])
+            
+            if not events:
+                return f"No encontré eventos con '{texto_a_buscar}' en el calendario para este mes."
+
+            for event in events:
+                service.events().delete(calendarId='primary', eventId=event['id']).execute()
+            
+            return f"✅ He borrado {len(events)} eventos que contenían '{texto_a_buscar}' de tu calendario de este mes."
+
+        except Exception as e:
+            logger.error(f"Error borrando eventos: {e}")
+            return f"❌ Fallo al borrar eventos: {str(e)}"
             
         try:
             service = build('tasks', 'v1', credentials=self.creds)

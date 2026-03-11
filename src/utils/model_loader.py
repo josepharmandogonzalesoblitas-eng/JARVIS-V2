@@ -7,6 +7,8 @@ logger = logging.getLogger("model_loader")
 # Modelos en orden de preferencia explícita (MECE — sin ambigüedad)
 # gemini-2.0-flash es el modelo actual estable y rápido (2025-2026)
 _PRIORIDAD_MODELOS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
     "gemini-2.0-flash-001",
@@ -19,7 +21,7 @@ _PRIORIDAD_MODELOS = [
 ]
 
 # Fallback definitivo si todo falla (modelo estable y ampliamente disponible)
-_FALLBACK_MODEL = "gemini-2.0-flash"
+_FALLBACK_MODEL = "gemini-2.5-flash"
 
 
 def get_best_model_name() -> str:

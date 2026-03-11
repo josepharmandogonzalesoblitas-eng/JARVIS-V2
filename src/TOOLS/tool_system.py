@@ -56,6 +56,17 @@ def ejecutar_herramienta_sistema(nombre: str, params: Dict[str, Any]) -> str:
             if not query:
                 return "Error: No se proporcionó un término de búsqueda."
 
+            # Inteligencia Geográfica: si el usuario pide algo "cerca",
+            # inyectamos la ciudad del contexto.
+            if "cerca" in query.lower() or "aquí" in query.lower() or "mi zona" in query.lower():
+                from src.data import db_handler, schemas
+                try:
+                    entorno = db_handler.read_data("entorno.json", schemas.Entorno)
+                    if entorno.ubicacion and entorno.ubicacion not in query:
+                        query += f" en {entorno.ubicacion}"
+                except Exception:
+                    pass # Si falla, la búsqueda se hace sin contexto
+
             # Graceful Degradation: si ninguna librería está disponible
             if DDGS is None:
                 return "Error: Librería de búsqueda web no disponible. Instala duckduckgo_search."

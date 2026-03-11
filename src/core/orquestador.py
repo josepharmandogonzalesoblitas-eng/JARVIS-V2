@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # --- MODULARIDAD: Inversión de Dependencias ---
-from src.core.cerebro import CerebroDigital, PensamientoJarvis
+from src.core.fsm.state_machine import FSMOrquestador
 from src.core.memory_manager import MemoryManager
 from src.core.emotion_engine import emotion_engine
 from src.core.conversation_state import conversation_state_manager
@@ -48,12 +48,15 @@ class Orquestador:
         self.data_repo = data_repo
         self.vector_repo = vector_repo
         self.tools_repo = tools_repo
-        self.cerebro = CerebroDigital()
         self.memory_manager = MemoryManager(vector_repo=self.vector_repo)
+        self.fsm = FSMOrquestador(tools_repo=self.tools_repo, memory_manager=self.memory_manager)
 
         # Buffer de conversación en memoria (short-term memory)
         self._historial_reciente: list = []
-
+        
+        # Trazabilidad / Observabilidad
+        self.trace_log: list = []
+        
         # Archivo adjunto pendiente de enviar (foto/gráfico generado por herramienta)
         # El telegram_bot lo lee y envía como photo/document
         self._pending_attachment: Optional[str] = None
@@ -78,7 +81,8 @@ class Orquestador:
             Respuesta final en texto para enviar al usuario.
         """
         try:
-            # Limpiar adjunto previo
+            # Limpiar traza y adjunto previo
+            self.trace_log.clear()
             self._pending_attachment = None
 
             if not texto_limpio and not audio_path and not image_path:
@@ -111,8 +115,7 @@ class Orquestador:
                     f"Respuesta: '{texto_limpio}'"
                 )
 
-                pensamiento = await self.cerebro.pensar(prompt_terapeuta, contexto_str)
-                respuesta_empatica = pensamiento.respuesta_usuario
+                respuesta_empatica = await self.fsm.step_4_synthesize(prompt_terapeuta, contexto_str)
 
                 if siguiente:
                     return f"{respuesta_empatica}\n\n{siguiente}"
@@ -153,71 +156,65 @@ class Orquestador:
             # 1. CARGA DE CONTEXTO (RAG) - ASÍNCRONO
             contexto_str = await self._construir_contexto_async(texto_limpio or "")
 
-            # 2. INFERENCIA (El Cerebro Piensa)
-            pensamiento: PensamientoJarvis = await self.cerebro.pensar(
-                texto_limpio or "",
-                contexto_str,
-                audio_path,
-                image_path
-            )
-
-            # 3. PROCESAMIENTO DE MEMORIA
-            if pensamiento.memoria_intencion:
-                await self.memory_manager.procesar_intencion_memoria(
-                    pensamiento.memoria_intencion,
-                    pensamiento.memoria_datos or {}
-                )
-
-            print(f"\n[DEBUG PENSAMIENTO]: {pensamiento.model_dump_json(indent=2)}\n")
+            # 2. FASE 1: ENRUTAMIENTO O(1)
+            route_info = await self.fsm.step_1_route(texto_limpio or "", contexto_str)
+            intencion = route_info.get("intencion", "charla")
+            herramienta = route_info.get("herramienta")
+            memoria = route_info.get("memoria")
             
-            # 4. EJECUCIÓN DE INTENCIÓN (Router Lógico)
-            respuesta_final = pensamiento.respuesta_usuario
+            print(f"\n[DEBUG ROUTER]: {route_info}\n")
 
-            if pensamiento.intencion == "fallback_error":
-                return respuesta_final
+            resultado_tool = None
+            params_extra = {}
 
-            elif pensamiento.intencion == "comando":
-                if pensamiento.herramienta_sugerida and pensamiento.herramienta_sugerida != "None":
-                    if pensamiento.herramienta_sugerida == "gestionar_memoria":
-                        resultado_tool = await self._ejecutar_memoria_async(pensamiento.datos_extra or {})
-                    else:
-                        resultado_tool = self._ejecutar_herramienta(
-                            pensamiento.herramienta_sugerida,
-                            pensamiento.datos_extra or {}
-                        )
-
-                    # Detectar archivos adjuntos generados por herramientas
+            # 3. FASE 2: EXTRACCIÓN Y EJECUCIÓN (Zero-Trust)
+            if herramienta:
+                try:
+                    params_extra = await self.fsm.step_2_extract(texto_limpio or "", contexto_str, herramienta)
+                    resultado_tool = await self.fsm.step_3_execute(herramienta, params_extra)
+                    self.trace_log.append(f"🔨 Tool: {herramienta} | ✅ OK")
+                    
                     if resultado_tool.startswith(ARCHIVO_ADJUNTO_PREFIX):
                         self._pending_attachment = resultado_tool[len(ARCHIVO_ADJUNTO_PREFIX):]
-                        # La respuesta de texto es la del LLM (ya tiene descripción)
-                    elif "no encontrada en el módulo" in resultado_tool or "no encontrada" in resultado_tool.lower():
-                        # ─── FALLBACK: La IA inventó una herramienta inexistente ──────────────
-                        # Si el usuario parece querer algo con herramientas, mostrar el menú
+                    elif "no encontrada" in resultado_tool.lower():
+                        logger.warning(f"Herramienta inventada o no encontrada: {herramienta}")
+                        self.trace_log[-1] = f"🔨 Tool: {herramienta} | ❓ Not Found"
+                        # Fallback a menú
                         texto_lower = (texto_limpio or "").lower()
                         parece_herramienta = any(kw in texto_lower for kw in _PALABRAS_CLAVE_HERRAMIENTAS)
                         if parece_herramienta and usuario_id != "SISTEMA_CRON":
-                            logger.warning(f"Herramienta inventada: '{pensamiento.herramienta_sugerida}'. Mostrando menú.")
-                            respuesta_final = MENU_HERRAMIENTAS_MARKER + respuesta_final
-                        else:
-                            respuesta_final += f"\n\n{resultado_tool}"
-                    else:
-                        respuesta_final += f"\n\n{resultado_tool}"
+                            resultado_tool = MENU_HERRAMIENTAS_MARKER + "Herramienta no disponible."
 
-                    # Si se activó modo terapeuta, enviar primera pregunta
-                    if (pensamiento.herramienta_sugerida == "activar_modo"
-                            and (pensamiento.datos_extra or {}).get("modo") == "terapeuta"):
-                        primera_pregunta = conversation_state_manager.siguiente_pregunta_terapeuta()
-                        if primera_pregunta:
-                            respuesta_final += f"\n\n{primera_pregunta}"
+                except ValueError as e:
+                    logger.error(f"Error extrayendo parámetros: {e}")
+                    resultado_tool = "Faltan datos para ejecutar la herramienta. ¿Puedes ser más específico?"
+                    self.trace_log.append(f"🔨 Tool: {herramienta} | ❌ FAIL")
 
-                else:
-                    # ─── FALLBACK: La IA dijo "comando" pero no eligió herramienta ──────────
-                    # Solo mostramos el menú si el mensaje parece ser una solicitud de herramienta
-                    texto_lower = (texto_limpio or "").lower()
-                    parece_herramienta = any(kw in texto_lower for kw in _PALABRAS_CLAVE_HERRAMIENTAS)
-                    if parece_herramienta and usuario_id != "SISTEMA_CRON":
-                        logger.info("Intención 'comando' sin herramienta detectada. Mostrando menú de herramientas.")
-                        respuesta_final = MENU_HERRAMIENTAS_MARKER + respuesta_final
+            # Procesamiento de Memoria asíncrono si aplica
+            if memoria:
+                try:
+                    params_mem = await self.fsm.step_2_extract(texto_limpio or "", contexto_str, f"memoria_{memoria}")
+                    await self.memory_manager.procesar_intencion_memoria(memoria, params_mem)
+                    self.trace_log.append(f"🧠 Memoria: {memoria} | ✅ OK")
+                except Exception as e:
+                    logger.warning(f"No se pudo guardar la memoria {memoria}: {e}")
+                    self.trace_log.append(f"🧠 Memoria: {memoria} | ❌ FAIL")
+
+            # 4. FASE 3: SÍNTESIS NATURAL
+            respuesta_final = await self.fsm.step_4_synthesize(
+                texto_limpio or "",
+                contexto_str,
+                tool_result=resultado_tool,
+                audio=audio_path,
+                image=image_path
+            )
+            
+            # Post-procesamiento modo terapeuta si se activó
+            if herramienta == "activar_modo" and params_extra.get("modo") == "terapeuta":
+                primera_pregunta = conversation_state_manager.siguiente_pregunta_terapeuta()
+                if primera_pregunta:
+                    respuesta_final += f"\n\n{primera_pregunta}"
+
 
             # ─── POST-PROCESAMIENTO EMOCIONAL ─────────────────────────────────
 
@@ -254,6 +251,13 @@ class Orquestador:
                 })
                 if len(self._historial_reciente) > 12:
                     self._historial_reciente = self._historial_reciente[-12:]
+
+            # Añadir Debug Footer si hay traza
+            if self.trace_log:
+                trace_str = " | ".join(self.trace_log)
+                respuesta_final += f"\n\n`🛠️ [DEBUG]: 🤖 Router: {intencion} | {trace_str}`"
+            else:
+                respuesta_final += f"\n\n`🛠️ [DEBUG]: 🤖 Router: {intencion}`"
 
             return respuesta_final
 

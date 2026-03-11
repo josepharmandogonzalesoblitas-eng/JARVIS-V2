@@ -18,7 +18,7 @@ class GoogleGenAIEmbeddingFunction(EmbeddingFunction[Documents]):
     - Reemplazar la deprecada GoogleGenerativeAiEmbeddingFunction de chromadb
       (que usaba google.generativeai, la SDK antigua)
     """
-    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+    def __init__(self, api_key: str, model_name: str = "models/gemini-embedding-001"):
         from google import genai
         self._client = genai.Client(api_key=api_key)
         self._model_name = model_name
@@ -35,7 +35,7 @@ class GoogleGenAIEmbeddingFunction(EmbeddingFunction[Documents]):
         import os
         return GoogleGenAIEmbeddingFunction(
             api_key=os.getenv("GEMINI_API_KEY", ""),
-            model_name=config.get("model_name", "models/text-embedding-004")
+            model_name=config.get("model_name", "models/gemini-embedding-001")
         )
 
     def __call__(self, input: Documents) -> Embeddings:

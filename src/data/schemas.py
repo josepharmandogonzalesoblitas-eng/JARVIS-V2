@@ -34,9 +34,9 @@ class Tarea(BaseModel):
 
 class Proyecto(BaseModel):
     nombre: str
-    descripcion: str
-    stack_tecnologico: List[str]
-    estado_actual: str
+    descripcion: str = ""
+    stack_tecnologico: List[str] = Field(default_factory=list)
+    estado_actual: str = "iniciado"
     tareas_pendientes: List[Tarea] = Field(default_factory=list)
     ultima_actualizacion: datetime = Field(default_factory=datetime.now)
 

@@ -24,9 +24,10 @@ def init_db():
     Bootstrapping con datos válidos (Fail-Safe).
     Crea archivos con datos dummy válidos si no existen.
     """
-    if not os.path.exists(MEMORY_PATH):
-        os.makedirs(MEMORY_PATH)
-        logger.info(f"Directorio {MEMORY_PATH} creado.")
+    with _db_lock:
+        if not os.path.exists(MEMORY_PATH):
+            os.makedirs(MEMORY_PATH)
+            logger.info(f"Directorio {MEMORY_PATH} creado.")
     
     # DATOS SEMILLA (Deben coincidir con schemas.py)
     initial_data = {
@@ -71,12 +72,13 @@ def init_db():
         }
     }
 
-    for filename, data in initial_data.items():
-        path = _get_path(filename)
-        if not os.path.exists(path):
-            with open(path, 'w', encoding='utf-8') as file:
-                json.dump(data, file, indent=4, ensure_ascii=False)
-            logger.info(f"Archivo base {filename} generado correctamente.")
+    with _db_lock:
+        for filename, data in initial_data.items():
+            path = _get_path(filename)
+            if not os.path.exists(path):
+                with open(path, 'w', encoding='utf-8') as file:
+                    json.dump(data, file, indent=4, ensure_ascii=False)
+                logger.info(f"Archivo base {filename} generado correctamente.")
 
 def read_data(filename: str, model: Type[BaseModel]) -> BaseModel:
     path = _get_path(filename)
@@ -86,8 +88,9 @@ def read_data(filename: str, model: Type[BaseModel]) -> BaseModel:
         init_db()
     
     try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        with _db_lock:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
         return model(**data)
     except Exception as e:
         logger.error(f"Error leyendo o parseando JSON desde {filename}: {e}", exc_info=True)
@@ -103,11 +106,12 @@ def save_data(filename: str, data: BaseModel):
     
     try:
         json_data = data.model_dump(mode='json')
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(json_data, f, indent=4, ensure_ascii=False)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_path, path)
+        with _db_lock:
+            with open(temp_path, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=4, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, path)
     except Exception as e:
         if os.path.exists(temp_path):
             try:

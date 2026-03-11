@@ -9,6 +9,7 @@ para futuros prompts auxiliares.
 """
 
 def get_system_prompt() -> str:
-    from src.core.cerebro import CerebroDigital
-    # Fallback/referencia al prompt real
-    return CerebroDigital()._get_system_prompt()
+    from src.core.pipeline.synthesizer import ResponseSynthesizer
+    from src.core.llm.gemini_provider import GeminiProvider
+    # Retorna el prompt base de síntesis
+    return ResponseSynthesizer(GeminiProvider()).system_prompt

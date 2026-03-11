@@ -1,0 +1,338 @@
+[33mcommit 6b58ac21a486bbfb65038c77debcc9e8b7d3bad1[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Mon Mar 9 19:07:16 2026 -0500
+
+    docs: agregar TELEGRAM_API_ID/HASH al .env.jarvis.example (Telethon)
+
+ DEPLOY_ORACLE/config/.env.jarvis.example | 7 [32m+++++++[m
+ 1 file changed, 7 insertions(+)
+
+[33mcommit 1be7234576f1d8e36815037f110551d1d6737057[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Mon Mar 9 19:05:25 2026 -0500
+
+    security: eliminar archivos sensibles del tracking git
+    
+    - MEMORIA/*.json: datos personales del usuario, no deben ir en git
+    - Scripts de prueba locales removidos del tracking
+    - .gitignore actualizado para excluir permanentemente estos archivos
+    - Zero-Trust: ningun dato personal ni credencial en el repo
+
+ .gitignore | 18 [32m+++++++++++++++++[m[31m-[m
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+[33mcommit dcc4c7eac31d68c5148b922f036cfc606eb96d39[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Mon Mar 9 18:58:47 2026 -0500
+
+    fix: model_loader - reemplazar gemini-1.5-flash-8b (deprecated) por gemini-2.0-flash
+    
+    - Lista de prioridad explicita MECE: gemini-2.0-flash primero
+    - Fallback definitivo cambiado a gemini-2.0-flash (estable 2025-2026)
+    - Excluir modelos -8b, thinking y exp del auto-descubrimiento en produccion
+    - Principios: Fail-Safe, Poka-Yoke, Type-Safety, KISS
+
+ src/utils/model_loader.py | 83 [32m++++++++++++++++++++++++++++++++++++[m[31m-----------[m
+ 1 file changed, 64 insertions(+), 19 deletions(-)
+
+[33mcommit 6145e04fdb9f42507873792364dc26f557a767b3[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Mon Mar 9 18:53:44 2026 -0500
+
+    feat: JARVIS V2 - Mejoras completas de arquitectura y herramientas
+    
+    CEREBRO (src/core/cerebro.py):
+    - Sistema de prompt mejorado con reglas MECE para herramientas
+    - Soporte Gemini Vision para imagenes inline (mas rapido que Files API)
+    - Fallback inteligente (hora/estado) cuando Gemini falla (Graceful Degradation)
+    - Manejo correcto de APIError de google-genai SDK
+    
+    ORQUESTADOR (src/core/orquestador.py):
+    - Menu interactivo de herramientas cuando IA no identifica herramienta
+    - Marker MENU_HERRAMIENTAS_MARKER para comunicacion con Telegram bot
+    - Palabras clave para detectar intenciones de herramientas (MECE)
+    - Soporte completo para modos de conversacion (Terapeuta, Foco, Silencio)
+    - Pipeline asincrono con concurrencia (asyncio.gather)
+    
+    TELEGRAM BOT (src/INTERFACES/telegram_bot.py):
+    - Menu interactivo con InlineKeyboardMarkup para seleccion de herramientas
+    - Handler de callback para re-procesar mensajes con herramienta forzada
+    - Comandos: /test_cron, /clima, /mes, /progreso, /foco, /silencio, /terapeuta
+    - Soporte de fotos (Gemini Vision) y documentos imagen
+    - TTS opcional por mensaje (gTTS)
+    
+    HERRAMIENTAS:
+    - tool_weather.py: Clima actual + pronostico dias, sugerencias proactivas
+    - tool_agenda.py: Google Calendar/Tasks con Idempotencia (anti-duplicados)
+    - tool_graphs.py: Graficos energia, progreso proyectos, resumen mensual (matplotlib)
+    - tool_memory.py: Gestion de memoria estructurada y vectorial
+    - tool_system.py: Estado del sistema, hora, alarmas rapidas
+    
+    MEMORIA (src/core/memory_manager.py):
+    - guardar_conversacion_profunda con follow-up automatico
+    - registrar_logro con vector DB
+    - Type-Safety en nivel_energia (clamp 1-10, Graceful Degradation)
+    - Idempotencia en recordatorios (no duplicados)
+    
+    SCHEMAS (src/data/schemas.py):
+    - EstadoEmocionalSistema con conversaciones_profundas y metas_activas
+    - ConversacionProfundaItem con fecha_followup para CRON
+    - Nuevos campos para estado emocional del sistema
+    
+    SCRIPTS UTILITARIOS (nuevos):
+    - script_cron_riguroso.py: Pruebas rigurosas del CRON
+    - script_cron_riguroso_estados.py: Pruebas de estados emocionales
+    - script_real_telegram.py: Test E2E via Telegram real
+    
+    SEGURIDAD:
+    - .gitignore: Excluir *.session (credenciales Telegram)
+    - Zero-Trust: Sanitizador actua ANTES del procesamiento
+    - Sanitizacion no expone payload al usuario
+    
+    NOTAS DE DESPLIEGUE:
+    - Google Calendar/Tasks requiere token.json valido en el servidor
+    - Clima requiere OPENWEATHER_API_KEY en .env
+    - Respuestas de inyeccion son normales (bot sanitiza internamente)
+
+ .clineignore                   |   3 [32m+[m[31m-[m
+ .gitignore                     |   3 [32m+[m
+ requirements.txt               |   2 [32m+[m[31m-[m
+ src/INTERFACES/telegram_bot.py | 282 [32m++++++++++++++++++++++++++++++++[m[31m---------[m
+ src/TOOLS/tool_agenda.py       |   4 [32m+[m[31m-[m
+ src/TOOLS/tool_graphs.py       |  31 [32m++++[m[31m-[m
+ src/TOOLS/tool_memory.py       |  26 [32m+++[m[31m-[m
+ src/TOOLS/tool_system.py       |  42 [32m++++[m[31m--[m
+ src/core/cerebro.py            |  46 [32m++++++[m[31m-[m
+ src/core/memory_manager.py     |  32 [32m++++[m[31m-[m
+ src/core/orquestador.py        |  35 [32m+++++[m
+ src/data/schemas.py            |   2 [32m+[m[31m-[m
+ src/utils/model_loader.py      |   6 [32m+[m[31m-[m
+ 13 files changed, 421 insertions(+), 93 deletions(-)
+
+[33mcommit 2cac3c6a8a0875a10b9088aa0a31f363c8ae33c6[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 21:44:35 2026 -0500
+
+    Fix memory intention routing and async tool execution for projects and chromadb
+
+ src/core/cerebro.py     |  6 [32m+++++[m[31m-[m
+ src/core/orquestador.py | 13 [32m+++++++++[m[31m----[m
+ 2 files changed, 14 insertions(+), 5 deletions(-)
+
+[33mcommit a855e376b294a2b2b5dd8816a1a89824045867a7[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 15:39:29 2026 -0500
+
+    fix(tools): arreglar integraciones y respuestas de tools (clima, calendario) y filtraciones crudas
+
+ src/TOOLS/tool_agenda.py  | 13 [32m+++++[m[31m--------[m
+ src/TOOLS/tool_weather.py |  2 [32m+[m[31m-[m
+ src/core/cerebro.py       | 20 [32m++++++++++++++[m[31m------[m
+ 3 files changed, 20 insertions(+), 15 deletions(-)
+
+[33mcommit 265b4563818a3cc9ab45d64c89a9f92489505061[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 15:25:14 2026 -0500
+
+    chore: actualiza ciudad por defecto para Trujillo en la plantilla .env
+
+ DEPLOY_ORACLE/config/.env.jarvis.example | 2 [32m+[m[31m-[m
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+[33mcommit ae2b5651e4ca7bf19b808a076005ab69f7365e0c[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 15:15:56 2026 -0500
+
+    fix: corrige invencion de herramientas en cerebro y expande tests E2E con side-effects reales
+
+ src/core/cerebro.py       |  22 [32m++++++[m[31m--[m
+ tests/test_e2e_real_v2.py | 136 [32m++++++++++++++++++++++++++++++++++++++++++[m[31m----[m
+ 2 files changed, 142 insertions(+), 16 deletions(-)
+
+[33mcommit 8d289529abd186bdb9e80e2998e3238f2747adba[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 12:20:16 2026 -0500
+
+    fix(cerebro): prevent hallucination of non-existent tools for drafting and force immediate response
+
+ src/core/cerebro.py | 5 [32m+++++[m
+ 1 file changed, 5 insertions(+)
+
+[33mcommit 1d4a397fbc220d243ff0bb9b0ec8ba0639c23991[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 12:01:38 2026 -0500
+
+    feat(cerebro): zero friction optimization
+
+ src/core/cerebro.py     | 24 [32m+++++++++++[m[31m-------------[m
+ src/core/orquestador.py | 21 [32m+++++++++++[m[31m----------[m
+ src/core/prompts.py     | 47 [32m++++++++[m[31m---------------------------------------[m
+ 3 files changed, 30 insertions(+), 62 deletions(-)
+
+[33mcommit 5b3eb1801ab94cc19f32a4a4677d5c0c68065d0d[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 11:36:56 2026 -0500
+
+    feat: inyectar personalidad, estado conversacion casual y aislar productividad
+
+ src/core/cerebro.py |  14 [32m++++[m[31m-[m
+ src/core/cron.py    | 161 [32m+++++++++++++++++++++++++++++++++++++++[m[31m-------------[m
+ src/data/schemas.py |   1 [32m+[m
+ 3 files changed, 134 insertions(+), 42 deletions(-)
+
+[33mcommit 5f074df93ef70a6e1025275a33e0bc088a7f6d27[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sun Mar 8 10:58:53 2026 -0500
+
+    docs: rewrite DOCUMENTACION.txt - clean format + full V3.0 coverage (11 sections)
+
+ DOCUMENTACION.txt | 854 [32m++++++++++++++++++++++++++++++++++++++++[m[31m--------------[m
+ 1 file changed, 643 insertions(+), 211 deletions(-)
+
+[33mcommit 8809f6f612ff5fcd083844f5a8701380f52bd6f1[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sat Mar 7 03:22:05 2026 -0500
+
+    fix(chroma): auto-recreate collection on embedding function conflict (v1 DB migration)
+
+ src/core/repositories.py | 34 [32m++++++++++++++++++++++++++++[m[31m------[m
+ 1 file changed, 28 insertions(+), 6 deletions(-)
+
+[33mcommit fae69f06d7ef58e26cb2a6b8867071289c408e53[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sat Mar 7 03:08:42 2026 -0500
+
+    fix(deploy): increase memory limit to 1G for TTS+Matplotlib+ChromaDB in V2
+
+ docker-compose.yml | 22 [32m++++++++++++++++++++++[m
+ 1 file changed, 22 insertions(+)
+
+[33mcommit cc594b1fc49fa18ecc34396c1105e977fce8b504[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sat Mar 7 03:07:03 2026 -0500
+
+    fix(docker): add ffmpeg, libgomp1, fonts-dejavu and MPLBACKEND=Agg for TTS+Graphs in ARM64
+
+ Dockerfile | 75 [32m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++[m
+ 1 file changed, 75 insertions(+)
+
+[33mcommit 853d6c99b16376b525a4316b2e38cd8181cf6ead[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sat Mar 7 03:04:42 2026 -0500
+
+    feat: JARVIS V2 - Personalidad, Emociones e Iniciativa Propia
+    
+    NUEVOS MODULOS:
+    - src/core/conversation_state.py: Modos de conversacion (escucha, foco, silencioso, terapeuta)
+    - src/core/emotion_engine.py: Motor emocional (crisis, logros, triggers, followups)
+    - src/TOOLS/tool_tts.py: Respuestas en voz con gTTS (sin API key)
+    - src/TOOLS/tool_weather.py: Clima con OpenWeatherMap (API key opcional)
+    - src/TOOLS/tool_graphs.py: Graficos de energia, proyectos y resumen mensual
+    
+    ACTUALIZACIONES CORE:
+    - cerebro.py: Soporte Gemini Vision (imagenes), 8 nuevas intenciones, prompt expandido
+    - orquestador.py: EmotionEngine + ConversationState + image_path + adjuntos
+    - memory_manager.py: guardar_conversacion_profunda(), registrar_logro() con followup
+    - cron.py: 8 nuevas tareas (clima matutino, followups, triggers metas, terapeuta dominical, sugerencias web)
+    - tool_system.py: 8 nuevas herramientas (clima, graficos, activar/desactivar modos)
+    - db_handler.py: Bootstrap de estado_emocional.json
+    - telegram_bot.py: 11 nuevos comandos, handler fotos (Vision AI), documentos, TTS integrado
+    
+    NUEVOS COMANDOS TELEGRAM:
+    /tts /escucha /foco /silencio /terapeuta /normal /estado /progreso /mes /clima /ayuda
+    
+    TESTS: 47/47 pasando
+
+ DEPLOY_ORACLE/config/.env.jarvis.example |  23 [32m+[m[31m-[m
+ requirements.txt                         |  10 [32m+[m
+ src/INTERFACES/telegram_bot.py           | 486 [32m++++++++++++++++++++++++++[m[31m-----[m
+ src/TOOLS/tool_graphs.py                 | 338 [32m+++++++++++++++++++++[m
+ src/TOOLS/tool_system.py                 |  67 [32m++++[m[31m-[m
+ src/TOOLS/tool_tts.py                    | 110 [32m+++++++[m
+ src/TOOLS/tool_weather.py                | 227 [32m+++++++++++++++[m
+ src/core/cerebro.py                      | 286 [32m+++++++++++++++[m[31m---[m
+ src/core/conversation_state.py           | 273 [32m+++++++++++++++++[m
+ src/core/cron.py                         | 417 [32m++++++++++++++++++++++[m[31m----[m
+ src/core/emotion_engine.py               | 354 [32m++++++++++++++++++++++[m
+ src/core/memory_manager.py               | 142 [32m+++++++++[m
+ src/core/orquestador.py                  | 295 [32m+++++++++++++[m[31m------[m
+ src/data/db_handler.py                   |   8 [32m+[m
+ src/data/schemas.py                      |  68 [32m+++++[m
+ tests/test_core_cerebro.py               |   5 [32m+[m[31m-[m
+ tests/test_e2e_real.py                   |  41 [32m++[m[31m-[m
+ 17 files changed, 2865 insertions(+), 285 deletions(-)
+
+[33mcommit 2279a9ca2068cd3e1910637f6aa520d914ff62b0[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Sat Mar 7 01:08:59 2026 -0500
+
+    fix: chromadb 1.5 compatibility - EmbeddingFunction inheritance + E2E tests with EphemeralClient
+    
+    - GoogleGenAIEmbeddingFunction now inherits EmbeddingFunction[Documents] (chromadb 1.5+)
+      - Adds embed_query(), name(), get_config(), build_from_config() - no more DeprecationWarnings
+    - E2E tests use EphemeralClient (in-memory) + deterministic hash embedding (no Google API needed for vector part)
+    - MemoryManager receives vector_repo via DI from Orquestador (same collection instance)
+    - All 47 tests pass: 8 E2E + 5 integration + 7 cerebro + 27 unit
+
+ pytest.ini                            |   3 [32m+[m
+ src/INTERFACES/telegram_bot.py        |   5 [32m+[m
+ src/TOOLS/tool_memory.py              |   3 [32m+[m
+ src/core/cerebro.py                   |  77 [32m+++++++[m[31m-----[m
+ src/core/interfaces.py                |   8 [32m++[m
+ src/core/memory_manager.py            | 110 [32m++++++++++++++++++[m
+ src/core/orquestador.py               |  46 [32m+++++[m[31m---[m
+ src/core/repositories.py              | 147 [32m++++++++++++++++++++++[m[31m-[m
+ src/data/db_handler.py                |  33 [32m+++[m[31m---[m
+ src/data/schemas.py                   |   3 [32m+[m[31m-[m
+ src/data/vector_db.py                 | 138 [32m+++++++++++++++[m[31m-------[m
+ src/utils/time_utils.py               |  14 [32m+++[m
+ tests/conftest.py                     |  55 [31m---------[m
+ tests/test_e2e_real.py                | 212 [32m++++++++++++++++++++++++++++++++++[m
+ tests/test_e2e_real_v2.py             | 145 [32m+++++++++++++++++++++++[m
+ tests/test_integration_orquestador.py |  25 [32m++[m[31m--[m
+ 16 files changed, 855 insertions(+), 169 deletions(-)
+
+[33mcommit babffae560a7e29a67b5c31162535b73638e190e[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Fri Mar 6 22:54:56 2026 -0500
+
+    fix: address user-reported bugs from manual testing
+
+ DOCUMENTACION.txt        | 15 [32m+++++++++++++++[m
+ requirements.txt         |  1 [32m+[m
+ src/TOOLS/tool_system.py | 19 [32m+++++++++++++++++[m[31m--[m
+ src/core/cerebro.py      |  9 [32m+++++[m[31m----[m
+ 4 files changed, 38 insertions(+), 6 deletions(-)
+
+[33mcommit 1cf606f0b3a696b2fd9abc5f7009e65293552c16[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Fri Mar 6 22:44:13 2026 -0500
+
+    fix: set mime_type for audio uploads in google-genai and update docs for 403 API errors
+
+ DOCUMENTACION.txt          | 12 [32m++++++++++++[m
+ src/core/cerebro.py        |  8 [32m+++++++[m[31m-[m
+ tests/test_core_cerebro.py |  5 [32m++++[m[31m-[m
+ 3 files changed, 23 insertions(+), 2 deletions(-)
+
+[33mcommit 184a074524b5fdd234305e583715bbd885c7b4aa[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Fri Mar 6 20:24:47 2026 -0500
+
+    chore: migrate to google-genai SDK to prevent deprecation warnings
+
+ requirements.txt           |  2 [32m+[m[31m-[m
+ src/core/cerebro.py        | 42 [32m++++++++++++++++++++[m[31m------------------[m
+ src/utils/model_loader.py  |  6 [32m+++[m[31m---[m
+ tests/test_core_cerebro.py | 51 [32m+++++++++++++++++++++++[m[31m-----------------------[m
+ 4 files changed, 51 insertions(+), 50 deletions(-)
+
+[33mcommit 8adffa5e1a45871a26db9a8864a7b199b081a2e0[m
+Author: Joseph Gonzales <josepharmandogonzalesoblitas@gmail.com>
+Date:   Fri Mar 6 20:12:40 2026 -0500
+
+    feat: implement rolling backups (7 days) and update test manual
+
+ DOCUMENTACION.txt   | 11 [32m+++++++++++[m
+ src/utils/backup.py | 25 [32m+++++++++++++++++++++++++[m
+ 2 files changed, 36 insertions(+)
