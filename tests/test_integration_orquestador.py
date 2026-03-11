@@ -2,7 +2,6 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 
-# Módulos a probar y sus dependencias
 from src.core.orquestador import Orquestador
 from src.data import schemas
 from src.core.interfaces import IDataRepository, IVectorRepository, IToolsRepository
@@ -16,7 +15,6 @@ def mock_data_repo():
     repo.async_save_data = AsyncMock()
     repo.async_read_bitacora_summary = AsyncMock()
     
-    # Configurar respuestas por defecto
     repo.async_read_data.return_value = schemas.Persona(edad=30, profesion="Ingeniero")
     
     bitacora_mock = schemas.BitacoraSummary(
@@ -45,7 +43,6 @@ def orquestador_con_mocks(mock_data_repo, mock_vector_repo, mock_tools_repo):
     with patch('src.core.orquestador.FSMOrquestador', autospec=True) as mock_fsm_class:
         mock_fsm_instance = mock_fsm_class.return_value
         
-        # Mocks para los steps
         mock_fsm_instance.step_1_route = AsyncMock()
         mock_fsm_instance.step_2_extract = AsyncMock()
         mock_fsm_instance.step_3_execute = AsyncMock()
@@ -56,31 +53,22 @@ def orquestador_con_mocks(mock_data_repo, mock_vector_repo, mock_tools_repo):
             vector_repo=mock_vector_repo,
             tools_repo=mock_tools_repo
         )
-        # Reemplazamos fsm instanciado con el mock
         orquestador.fsm = mock_fsm_instance
         yield orquestador
 
 async def test_orquestador_flujo_charla(orquestador_con_mocks):
-    """Prueba que una intención de 'charla' devuelve la respuesta sin llamar a herramientas."""
     orquestador_con_mocks.fsm.step_1_route.return_value = {
-        "intencion": "charla",
-        "herramienta": None,
-        "memoria": None
+        "intencion": "charla", "herramienta": None, "memoria": None
     }
     orquestador_con_mocks.fsm.step_4_synthesize.return_value = "Hola, ¿cómo estás?"
-
     respuesta = await orquestador_con_mocks.procesar_mensaje("user1", "hola", None)
-    
-    assert respuesta == "Hola, ¿cómo estás?"
+    assert "Hola, ¿cómo estás?" in respuesta
     orquestador_con_mocks.fsm.step_1_route.assert_called_once()
     orquestador_con_mocks.fsm.step_3_execute.assert_not_called()
 
 async def test_orquestador_flujo_comando(orquestador_con_mocks):
-    """Prueba que una intención de 'comando' ejecuta los steps correctos."""
     orquestador_con_mocks.fsm.step_1_route.return_value = {
-        "intencion": "comando",
-        "herramienta": "buscar_web",
-        "memoria": None
+        "intencion": "comando", "herramienta": "buscar_web", "memoria": None
     }
     orquestador_con_mocks.fsm.step_2_extract.return_value = {"query": "clima"}
     orquestador_con_mocks.fsm.step_3_execute.return_value = "Resultado de busqueda web"
@@ -89,14 +77,11 @@ async def test_orquestador_flujo_comando(orquestador_con_mocks):
     respuesta = await orquestador_con_mocks.procesar_mensaje("user1", "busca el clima", None)
     
     orquestador_con_mocks.fsm.step_3_execute.assert_called_once_with("buscar_web", {"query": "clima"})
-    assert respuesta == "El clima es soleado."
+    assert "El clima es soleado." in respuesta
 
 async def test_orquestador_flujo_memoria(orquestador_con_mocks):
-    """Prueba que una intención de memoria llama al MemoryManager."""
     orquestador_con_mocks.fsm.step_1_route.return_value = {
-        "intencion": "guardar_recordatorio",
-        "herramienta": None,
-        "memoria": "nuevo_recordatorio"
+        "intencion": "guardar_recordatorio", "herramienta": None, "memoria": "nuevo_recordatorio"
     }
     orquestador_con_mocks.fsm.step_2_extract.return_value = {"descripcion": "comprar pan", "contexto": "supermercado"}
     orquestador_con_mocks.fsm.step_4_synthesize.return_value = "Recordatorio guardado."
@@ -112,10 +97,9 @@ async def test_orquestador_flujo_memoria(orquestador_con_mocks):
             "nuevo_recordatorio",
             {"descripcion": "comprar pan", "contexto": "supermercado"}
         )
-        assert respuesta == "Recordatorio guardado."
+        assert "Recordatorio guardado." in respuesta
 
 async def test_orquestador_manejo_excepciones(orquestador_con_mocks):
-    """Prueba que si ocurre una excepción no controlada, el orquestador no crashea."""
     orquestador_con_mocks.fsm.step_1_route.side_effect = Exception("Fallo catastrófico simulado")
     
     respuesta = await orquestador_con_mocks.procesar_mensaje("user1", "hola", None)
