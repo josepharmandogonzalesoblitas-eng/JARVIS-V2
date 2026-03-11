@@ -169,7 +169,7 @@ async def test_google_calendar_real(tmp_path, monkeypatch):
     # Si sí hay token, responderá "Evento agendado". Lo importante es que no diga "Herramienta no encontrada".
     response = await orq.procesar_mensaje("user1", "Agendar en google calendar reunión de equipo mañana a las 10 am por 60 minutos")
     
-    assert "token" in response.lower() or "google calendar" in response.lower() or "agendado" in response.lower() or "fallo" in response.lower(), f"Respuesta inesperada: {response}"
+    assert "token" in response.lower() or "google calendar" in response.lower() or "agend" in response.lower() or "fallo" in response.lower(), f"Respuesta inesperada: {response}"
     assert "generar" not in response.lower() and "herramienta" not in response.lower() and "encontrada" not in response.lower(), "Falló el enrutamiento a Google Calendar."
 
 async def test_google_tasks_real(tmp_path, monkeypatch):

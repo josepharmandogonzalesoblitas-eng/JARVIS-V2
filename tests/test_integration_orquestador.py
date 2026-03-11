@@ -71,7 +71,7 @@ async def test_orquestador_flujo_charla(orquestador_con_mocks):
 
     respuesta = await orquestador_con_mocks.procesar_mensaje("user1", "hola", None)
     
-    assert respuesta == "Hola, ¿cómo estás?"
+    assert "Hola, ¿cómo estás?" in respuesta
     orquestador_con_mocks.fsm.step_1_route.assert_called_once()
     orquestador_con_mocks.fsm.step_3_execute.assert_not_called()
 
@@ -89,7 +89,7 @@ async def test_orquestador_flujo_comando(orquestador_con_mocks):
     respuesta = await orquestador_con_mocks.procesar_mensaje("user1", "busca el clima", None)
     
     orquestador_con_mocks.fsm.step_3_execute.assert_called_once_with("buscar_web", {"query": "clima"})
-    assert respuesta == "El clima es soleado."
+    assert "El clima es soleado." in respuesta
 
 async def test_orquestador_flujo_memoria(orquestador_con_mocks):
     """Prueba que una intención de memoria llama al MemoryManager."""
@@ -112,7 +112,7 @@ async def test_orquestador_flujo_memoria(orquestador_con_mocks):
             "nuevo_recordatorio",
             {"descripcion": "comprar pan", "contexto": "supermercado"}
         )
-        assert respuesta == "Recordatorio guardado."
+        assert "Recordatorio guardado." in respuesta
 
 async def test_orquestador_manejo_excepciones(orquestador_con_mocks):
     """Prueba que si ocurre una excepción no controlada, el orquestador no crashea."""

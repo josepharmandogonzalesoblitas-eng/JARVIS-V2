@@ -252,6 +252,13 @@ class Orquestador:
                 if len(self._historial_reciente) > 12:
                     self._historial_reciente = self._historial_reciente[-12:]
 
+            # Añadir Debug Footer si hay traza
+            if self.trace_log:
+                trace_str = " | ".join(self.trace_log)
+                respuesta_final += f"\n\n`🛠️ [DEBUG]: 🤖 Router: {intencion} | {trace_str}`"
+            else:
+                respuesta_final += f"\n\n`🛠️ [DEBUG]: 🤖 Router: {intencion}`"
+
             return respuesta_final
 
         except Exception as e:
