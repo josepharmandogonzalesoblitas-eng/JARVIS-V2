@@ -13,6 +13,7 @@ except ImportError:
 
 logger = logging.getLogger("tool_agenda")
 
+# Permisos requeridos para Calendar y Tasks
 SCOPES = [
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/tasks'
@@ -24,9 +25,11 @@ class ToolAgenda:
         self._authenticate()
         
     def _authenticate(self):
+        """Autentica con la API de Google usando credentials.json."""
         if os.path.exists('token.json'):
             self.creds = Credentials.from_authorized_user_file('token.json', SCOPES)
         
+        # Si no hay credenciales válidas, no crasheamos, pero avisamos.
         if not self.creds or not self.creds.valid:
             if self.creds and self.creds.expired and self.creds.refresh_token:
                 try:
@@ -35,64 +38,72 @@ class ToolAgenda:
                     logger.error(f"Error refrescando token: {e}")
                     self.creds = None
             else:
-                self.creds = None
+                if os.path.exists('credentials.json'):
+                    logger.warning("No se encontró token.json válido. Se requiere autenticación manual.")
+                    logger.info("IMPORTANTE: En un VPS, generar token.json localmente y subirlo al servidor.")
+                    # Evitamos usar run_local_server en el backend para evitar que se congele el bot
+                    self.creds = None
+                else:
+                    logger.warning("No se encontró credentials.json ni token.json. Google Calendar/Tasks desactivado.")
+                    self.creds = None
 
     def crear_evento_calendar(self, resumen: str, fecha_inicio_iso: str, duracion_minutos: int = 60, descripcion: str = "") -> str:
+        """Crea un evento en Google Calendar, previniendo duplicados (Idempotencia)."""
         if not self.creds:
             return "Error: No hay conexión con Google Calendar (falta token.json)."
             
         try:
             service = build('calendar', 'v3', credentials=self.creds)
+            
             inicio = datetime.datetime.fromisoformat(fecha_inicio_iso.replace('Z', '+00:00'))
             fin = inicio + datetime.timedelta(minutes=duracion_minutos)
             
-            time_min = (inicio - datetime.timedelta(minutes=5)).isoformat() + "Z"
-            time_max = (inicio + datetime.timedelta(minutes=5)).isoformat() + "Z"
+            # IDEMPOTENCIA: Buscar eventos existentes en una ventana de +/- 5 minutos
+            time_min = (inicio - datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            time_max = (inicio + datetime.timedelta(minutes=5)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
             
             existing_events = service.events().list(
-                calendarId='primary', timeMin=time_min, timeMax=time_max, q=resumen, singleEvents=True
+                calendarId='primary',
+                timeMin=time_min,
+                timeMax=time_max,
+                q=resumen, # Filtrar por el mismo resumen
+                singleEvents=True,
+                orderBy='startTime'
             ).execute()
             
             if existing_events.get('items'):
+                logger.warning(f"IDEMPOTENCIA: Evento '{resumen}' duplicado detectado. No se creará uno nuevo.")
                 return f"⚠️ Ya existe un evento similar agendado para esa hora: '{resumen}'."
 
             evento = {
-                'summary': resumen, 'description': descripcion,
+                'summary': resumen,
+                'description': descripcion,
                 'start': {'dateTime': inicio.isoformat(), 'timeZone': 'America/Lima'},
                 'end': {'dateTime': fin.isoformat(), 'timeZone': 'America/Lima'},
+                'reminders': {'useDefault': False, 'overrides': [{'method': 'popup', 'minutes': 10}]},
             }
             
             event = service.events().insert(calendarId='primary', body=evento).execute()
             return f"✅ Evento '{resumen}' agendado. Enlace: {event.get('htmlLink')}"
+
         except Exception as e:
+            logger.error(f"Error en Calendar: {e}")
             return f"❌ Fallo al agendar en Calendar: {str(e)}"
 
     def crear_tarea(self, titulo: str, notas: str = "", fecha_vencimiento_iso: Optional[str] = None) -> str:
+        """Añade una tarea a Google Tasks, previniendo duplicados (Idempotencia)."""
         if not self.creds:
             return "Error: No hay conexión con Google Tasks (falta token.json)."
-        try:
-            service = build('tasks', 'v1', credentials=self.creds)
-            
-            task_list = service.tasks().list(tasklist='@default', showCompleted=False).execute()
-            for task in task_list.get('items', []):
-                if task.get('title', '').strip().lower() == titulo.strip().lower():
-                    return f"⚠️ Ya existe una tarea pendiente con ese nombre: '{titulo}'."
-
-            tarea = {'title': titulo, 'notes': notas}
-            if fecha_vencimiento_iso:
-                tarea['due'] = fecha_vencimiento_iso
-
-            result = service.tasks().insert(tasklist='@default', body=tarea).execute()
-            return f"✅ Tarea '{titulo}' añadida a Google Tasks."
-        except Exception as e:
-            return f"❌ Fallo al añadir tarea: {str(e)}"
-
+    
     def borrar_eventos_mes_actual(self, texto_a_buscar: str) -> str:
+        """Borra todos los eventos del mes actual que contengan el texto_a_buscar."""
         if not self.creds:
             return "Error: No hay conexión con Google Calendar (falta token.json)."
+
         try:
             service = build('calendar', 'v3', credentials=self.creds)
             
+            # Rango del mes actual
             now = datetime.datetime.now()
             start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             next_month = (start_of_month.replace(day=28) + datetime.timedelta(days=4))
@@ -102,7 +113,12 @@ class ToolAgenda:
             time_max = end_of_month.isoformat() + 'Z'
 
             events_result = service.events().list(
-                calendarId='primary', timeMin=time_min, timeMax=time_max, q=texto_a_buscar, singleEvents=True
+                calendarId='primary', 
+                timeMin=time_min,
+                timeMax=time_max,
+                q=texto_a_buscar,
+                singleEvents=True,
+                orderBy='startTime'
             ).execute()
             
             events = events_result.get('items', [])
@@ -113,6 +129,29 @@ class ToolAgenda:
             for event in events:
                 service.events().delete(calendarId='primary', eventId=event['id']).execute()
             
-            return f"✅ He borrado {len(events)} eventos que contenían '{texto_a_buscar}'."
+            return f"✅ He borrado {len(events)} eventos que contenían '{texto_a_buscar}' de tu calendario de este mes."
+
         except Exception as e:
+            logger.error(f"Error borrando eventos: {e}")
             return f"❌ Fallo al borrar eventos: {str(e)}"
+            
+        try:
+            service = build('tasks', 'v1', credentials=self.creds)
+            
+            # IDEMPOTENCIA: Buscar si ya existe una tarea con el mismo título
+            task_list = service.tasks().list(tasklist='@default', showCompleted=False).execute()
+            for task in task_list.get('items', []):
+                if task.get('title', '').strip().lower() == titulo.strip().lower():
+                    logger.warning(f"IDEMPOTENCIA: Tarea '{titulo}' duplicada detectada. No se creará una nueva.")
+                    return f"⚠️ Ya existe una tarea pendiente con ese nombre: '{titulo}'."
+
+            tarea = {'title': titulo, 'notes': notas}
+            if fecha_vencimiento_iso:
+                tarea['due'] = fecha_vencimiento_iso
+
+            result = service.tasks().insert(tasklist='@default', body=tarea).execute()
+            return f"✅ Tarea '{titulo}' añadida a Google Tasks."
+            
+        except Exception as e:
+            logger.error(f"Error en Tasks: {e}")
+            return f"❌ Fallo al añadir tarea: {str(e)}"
